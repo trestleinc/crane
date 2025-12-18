@@ -1,0 +1,32 @@
+# Local
+.DS_Store
+*.local
+*.log*
+
+# Dist
+node_modules
+dist/
+packages/*/dist
+examples/*/dist
+examples/*/.env
+examples/*/.env.local
+
+*.env*
+.env
+# IDE
+.idea
+
+# Build artifacts
+.rsbuild
+.vite
+.svelte-kit
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Test results (Vitest HTML/JSON reports)
+test-results/
+
+# Test Convex deployment
+src/test/convex/_generated/
