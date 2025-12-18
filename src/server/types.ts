@@ -114,22 +114,77 @@ export type CredentialResolver = (domain: string) => Promise<ResolvedCredential 
 
 /**
  * Options for executing a blueprint.
+ * Adapter and credentials come from CraneConfig, not passed here.
  */
 export type ExecuteOptions = {
   /** Blueprint ID to execute */
   blueprintId: string;
   /** Variables for tile parameter interpolation */
   variables: Record<string, unknown>;
-  /** Factory to create browser adapter */
-  adapter: AdapterFactory;
-  /** Optional credential resolver for AUTH tiles */
-  credentials?: CredentialResolver;
   /** App-specific context (deliverableId, beneficiaryId, etc.) */
   context?: unknown;
   /** Progress callback for tile status updates */
   onProgress?: (tileId: string, status: 'running' | 'completed' | 'failed') => void;
   /** Artifact callback for screenshots/files */
   onArtifact?: (type: string, tileId: string, data: Uint8Array) => Promise<string>;
+};
+
+// ============================================================================
+// Configuration Types
+// ============================================================================
+
+/**
+ * Browserbase configuration for Stagehand.
+ */
+export type BrowserbaseConfig = {
+  /** Browserbase API key */
+  apiKey: string;
+  /** Browserbase project ID */
+  projectId: string;
+};
+
+/**
+ * Model configuration for Stagehand AI operations.
+ */
+export type ModelConfig = {
+  /** Model name (default: 'gpt-4o') */
+  name?: string;
+  /** Model provider (default: 'openai') */
+  provider?: string;
+};
+
+/**
+ * Execution mode configuration.
+ */
+export type ExecutionConfig = {
+  /** Execution mode: 'internal' runs in Convex, 'external' POSTs to endpoint */
+  mode: 'internal' | 'external';
+  /** Browserbase config (required for both modes) */
+  browserbase: BrowserbaseConfig;
+  /** Model config for Stagehand AI (optional) */
+  model?: ModelConfig;
+  /** External endpoint URL (required for 'external' mode) */
+  endpoint?: string;
+};
+
+/**
+ * Credential resolution configuration.
+ */
+export type CredentialConfig = {
+  /** Table name with by_domain index for credential lookup */
+  table?: string;
+  /** Custom resolver function (alternative to table) */
+  resolver?: CredentialResolver;
+};
+
+/**
+ * Configuration for createExecutor (external HTTP execution).
+ */
+export type ExecutorConfig = {
+  /** Browserbase configuration */
+  browserbase: BrowserbaseConfig;
+  /** Model configuration */
+  model?: ModelConfig;
 };
 
 /**

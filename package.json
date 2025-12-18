@@ -76,7 +76,7 @@
   "peerDependencies": {
     "convex": "^1.31.0",
     "@anthropic-ai/sdk": ">=0.50.0",
-    "@browserbasehq/stagehand": ">=2.0.0"
+    "@browserbasehq/stagehand": "3.0.6"
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "1.1.1",

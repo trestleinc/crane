@@ -7,12 +7,14 @@
 import type { GenericActionCtx, GenericDataModel } from 'convex/server';
 import type {
   Adapter,
-  AdapterFactory,
   CredentialResolver,
+  ResolvedCredential,
   ExecuteOptions,
   ExecutionResult,
   TileResult,
   M2MClaims,
+  ExecutionConfig,
+  CredentialConfig,
 } from '$/server/types.js';
 
 // ============================================================================
@@ -21,8 +23,27 @@ import type {
 
 /**
  * Configuration for the crane instance.
+ *
+ * @example
+ * ```typescript
+ * const c = crane(components.crane)({
+ *   credentials: { table: 'credentials' },
+ *   execution: {
+ *     mode: 'internal',
+ *     browserbase: {
+ *       apiKey: process.env.BROWSERBASE_API_KEY!,
+ *       projectId: process.env.BROWSERBASE_PROJECT_ID!,
+ *     },
+ *   },
+ * });
+ * ```
  */
 export type CraneConfig = {
+  /** Credential resolution configuration */
+  credentials?: CredentialConfig;
+  /** Execution mode and provider configuration */
+  execution?: ExecutionConfig;
+  /** Lifecycle hooks */
   hooks?: {
     /** Called before read operations for authorization */
     read?: (ctx: GenericActionCtx<GenericDataModel>, organizationId: string) => void | Promise<void>;
@@ -380,6 +401,149 @@ async function verifyM2MToken(token: string): Promise<M2MClaims> {
 }
 
 // ============================================================================
+// Internal Execution (Stagehand in Convex Node Action)
+// ============================================================================
+
+/**
+ * Create a Stagehand adapter and execute tiles internally.
+ * Requires "use node" directive in the calling Convex action.
+ */
+async function executeInternal(
+  blueprint: SortableTile[] & { tiles: SortableTile[] },
+  variables: Record<string, unknown>,
+  credentialResolver: CredentialResolver | undefined,
+  executionConfig: ExecutionConfig,
+  options: ExecuteOptions
+): Promise<{ result: ExecutionResult; outputs: Record<string, unknown> }> {
+  const startTime = Date.now();
+  const tileResults: TileResult[] = [];
+  const outputs: Record<string, unknown> = {};
+
+  // Dynamic import of Stagehand (peer dependency)
+  const { Stagehand } = await import('@browserbasehq/stagehand');
+
+  const stagehand = new Stagehand({
+    env: 'BROWSERBASE',
+    apiKey: executionConfig.browserbase.apiKey,
+    projectId: executionConfig.browserbase.projectId,
+    // Model can be a string like 'gpt-4o' or ClientOptions with modelName
+    model: executionConfig.model?.name as any,
+  });
+
+  await stagehand.init();
+  const page = stagehand.context.pages()[0];
+
+  // Build adapter from Stagehand
+  const adapter: Adapter = {
+    navigate: async (url, opts) => {
+      await page.goto(url, opts);
+    },
+    act: async (instruction) => {
+      try {
+        const result = await stagehand.act(instruction);
+        return { success: result.success, message: result.message };
+      } catch (error) {
+        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    },
+    extract: async (instruction, schema) => {
+      if (schema) {
+        return stagehand.extract(instruction, schema as any);
+      }
+      const result = await stagehand.extract(instruction);
+      return result.extraction as any;
+    },
+    screenshot: async (opts) => {
+      const buffer = await page.screenshot({ fullPage: opts?.fullPage });
+      return new Uint8Array(buffer);
+    },
+    currentUrl: async () => page.url(),
+    close: async () => {
+      await stagehand.close();
+    },
+  };
+
+  try {
+    // Sort and execute tiles
+    const sortedTiles = sortTiles(blueprint.tiles);
+
+    for (const tile of sortedTiles) {
+      options.onProgress?.(tile.id, 'running');
+
+      const tileResult = await executeTile(
+        tile,
+        adapter,
+        { ...variables, ...outputs },
+        credentialResolver
+      );
+
+      tileResults.push(tileResult);
+      options.onProgress?.(tile.id, tileResult.status);
+
+      // Store extracted outputs
+      if (tileResult.status === 'completed' && tile.type === 'EXTRACT') {
+        const outputVar = tile.parameters.outputVariable as string;
+        if (outputVar) {
+          outputs[outputVar] = tileResult.result;
+        }
+      }
+
+      // Handle screenshot artifacts
+      if (tileResult.status === 'completed' && tile.type === 'SCREENSHOT' && options.onArtifact) {
+        const data = await adapter.screenshot({
+          fullPage: (tile.parameters.fullPage as boolean) ?? false,
+        });
+        await options.onArtifact('screenshot', tile.id, data);
+      }
+
+      // Stop on failure
+      if (tileResult.status === 'failed') {
+        break;
+      }
+    }
+
+    const success = tileResults.every((r) => r.status === 'completed');
+    return {
+      result: {
+        success,
+        duration: Date.now() - startTime,
+        outputs: success ? outputs : undefined,
+        error: success ? undefined : tileResults.find((r) => r.status === 'failed')?.error,
+        tileResults,
+      },
+      outputs,
+    };
+  } finally {
+    await adapter.close().catch(() => {});
+  }
+}
+
+/**
+ * Execute via external HTTP endpoint.
+ */
+async function executeExternal(
+  blueprint: unknown,
+  variables: Record<string, unknown>,
+  executionId: string,
+  endpoint: string
+): Promise<ExecutionResult> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blueprint, variables, executionId }),
+  });
+
+  if (!response.ok) {
+    return {
+      success: false,
+      error: `External execution failed: ${response.status} ${response.statusText}`,
+    };
+  }
+
+  return response.json();
+}
+
+// ============================================================================
 // Factory Function
 // ============================================================================
 
@@ -387,15 +551,52 @@ async function verifyM2MToken(token: string): Promise<M2MClaims> {
  * Create a crane instance bound to your component.
  *
  * @example
+ * ```typescript
  * // convex/crane.ts
  * import { crane } from '@trestleinc/crane/server';
  * import { components } from './_generated/api';
  *
- * export const c = crane(components.crane);
+ * const c = crane(components.crane)({
+ *   credentials: { table: 'credentials' },
+ *   execution: {
+ *     mode: 'internal',
+ *     browserbase: {
+ *       apiKey: process.env.BROWSERBASE_API_KEY!,
+ *       projectId: process.env.BROWSERBASE_PROJECT_ID!,
+ *     },
+ *   },
+ * });
+ *
+ * export const execute = internalAction({
+ *   args: { blueprintId: v.string(), variables: v.any() },
+ *   handler: (ctx, args) => c.execute(ctx, args),
+ * });
+ * ```
  */
 export function crane(component: any) {
   return function boundCrane(config?: CraneConfig) {
     const hooks = config?.hooks;
+
+    /**
+     * Build credential resolver from config.
+     * Note: For table-based resolution, the component must expose a query endpoint.
+     */
+    const buildCredentialResolver = (
+      _ctx: GenericActionCtx<GenericDataModel>
+    ): CredentialResolver | undefined => {
+      if (config?.credentials?.resolver) {
+        return config.credentials.resolver;
+      }
+      // Table-based credential resolution requires a component query
+      // The app should use the resolver option with ctx.runQuery to their own credential table
+      if (config?.credentials?.table) {
+        console.warn(
+          'Table-based credential resolution is not yet supported. ' +
+          'Use the resolver option with a custom function that queries your credential table.'
+        );
+      }
+      return undefined;
+    };
 
     return {
       /**
@@ -409,15 +610,14 @@ export function crane(component: any) {
       hooks: () => hooks,
 
       /**
-       * Execute a blueprint with the provided adapter.
+       * Execute a blueprint.
+       * Uses the execution mode configured in CraneConfig.
        *
        * @example
        * ```typescript
        * const result = await c.execute(ctx, {
        *   blueprintId: 'bp_123',
        *   variables: { firstName: 'John', portalUrl: 'https://example.com' },
-       *   adapter: createStagehandAdapter,
-       *   credentials: credentialResolver,
        * });
        * ```
        */
@@ -426,8 +626,24 @@ export function crane(component: any) {
         options: ExecuteOptions
       ): Promise<ExecutionResult> => {
         const startTime = Date.now();
-        const tileResults: TileResult[] = [];
-        const outputs: Record<string, unknown> = {};
+
+        // Validate execution config
+        if (!config?.execution) {
+          return {
+            success: false,
+            error: 'No execution config provided. Set execution.mode and execution.browserbase in CraneConfig.',
+            duration: Date.now() - startTime,
+          };
+        }
+
+        const mode = config.execution.mode;
+        if (mode === 'external' && !config.execution.endpoint) {
+          return {
+            success: false,
+            error: 'External mode requires execution.endpoint in CraneConfig.',
+            duration: Date.now() - startTime,
+          };
+        }
 
         // Fetch blueprint
         const blueprint = await ctx.runQuery(component.public.blueprint.get, {
@@ -453,86 +669,44 @@ export function crane(component: any) {
         // Start execution
         await ctx.runMutation(component.public.execution.start, { id: executionId });
 
-        // Create adapter
-        let adapter: Adapter;
-        try {
-          adapter = await options.adapter({
-            blueprintId: options.blueprintId,
-            contextId: undefined, // TODO: Get from vault if available
-          });
-        } catch (error) {
-          const result: ExecutionResult = {
-            success: false,
-            error: `Failed to create adapter: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            duration: Date.now() - startTime,
-          };
-          await ctx.runMutation(component.public.execution.complete, {
-            id: executionId,
-            result,
-          });
-          return result;
-        }
+        let result: ExecutionResult;
 
         try {
-          // Sort tiles by connection order
-          const sortedTiles = sortTiles(blueprint.tiles);
-
-          // Execute tiles in sequence
-          for (const tile of sortedTiles) {
-            options.onProgress?.(tile.id, 'running');
-
-            const tileResult = await executeTile(
-              tile,
-              adapter,
-              { ...options.variables, ...outputs },
-              options.credentials
+          if (mode === 'external') {
+            // External: POST to HTTP endpoint
+            result = await executeExternal(
+              blueprint,
+              options.variables,
+              executionId,
+              config.execution.endpoint!
             );
-
-            tileResults.push(tileResult);
-            options.onProgress?.(tile.id, tileResult.status);
-
-            // Store extracted outputs
-            if (tileResult.status === 'completed' && tile.type === 'EXTRACT') {
-              const outputVar = tile.parameters.outputVariable as string;
-              if (outputVar) {
-                outputs[outputVar] = tileResult.result;
-              }
-            }
-
-            // Handle screenshot artifacts
-            if (tileResult.status === 'completed' && tile.type === 'SCREENSHOT' && options.onArtifact) {
-              const data = await adapter.screenshot({
-                fullPage: (tile.parameters.fullPage as boolean) ?? false,
-              });
-              await options.onArtifact('screenshot', tile.id, data);
-            }
-
-            // Stop on failure
-            if (tileResult.status === 'failed') {
-              break;
-            }
+          } else {
+            // Internal: Run Stagehand directly
+            const credentialResolver = buildCredentialResolver(ctx);
+            const { result: execResult } = await executeInternal(
+              blueprint,
+              options.variables,
+              credentialResolver,
+              config.execution,
+              options
+            );
+            result = execResult;
           }
-
-          const success = tileResults.every((r) => r.status === 'completed');
-          const result: ExecutionResult = {
-            success,
+        } catch (error) {
+          result = {
+            success: false,
+            error: `Execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             duration: Date.now() - startTime,
-            outputs: success ? outputs : undefined,
-            error: success ? undefined : tileResults.find((r) => r.status === 'failed')?.error,
-            tileResults,
           };
-
-          // Complete execution
-          await ctx.runMutation(component.public.execution.complete, {
-            id: executionId,
-            result,
-          });
-
-          return result;
-        } finally {
-          // Always close adapter
-          await adapter.close().catch(() => {});
         }
+
+        // Complete execution
+        await ctx.runMutation(component.public.execution.complete, {
+          id: executionId,
+          result,
+        });
+
+        return result;
       },
 
       /**
