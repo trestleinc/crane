@@ -15,12 +15,14 @@
  *
  * @example
  * ```typescript
+ * // Stagehand v3 API
+ * const page = stagehand.context.pages()[0];
  * const adapter: Adapter = {
- *   navigate: (url) => stagehand.page.goto(url),
+ *   navigate: (url) => page.goto(url),
  *   act: (instruction) => stagehand.act(instruction),
- *   extract: (instruction, schema) => stagehand.extract(instruction, { schema }),
- *   screenshot: (opts) => stagehand.page.screenshot(opts),
- *   currentUrl: () => Promise.resolve(stagehand.page.url()),
+ *   extract: (instruction, schema) => stagehand.extract(instruction, schema),
+ *   screenshot: (opts) => page.screenshot(opts),
+ *   currentUrl: () => Promise.resolve(page.url()),
  *   close: () => stagehand.close(),
  * };
  * ```
@@ -54,16 +56,20 @@ export type Adapter = {
  *
  * @example
  * ```typescript
+ * // Stagehand v3 API
  * const createAdapter: AdapterFactory = async ({ blueprintId, contextId }) => {
- *   const stagehand = new Stagehand({
- *     env: 'BROWSERBASE',
- *     browserbaseSessionCreateParams: {
- *       projectId: process.env.BROWSERBASE_PROJECT_ID,
- *       browserSettings: contextId ? { context: { id: contextId, persist: true } } : undefined,
- *     },
- *   });
+ *   const stagehand = new Stagehand({ env: "BROWSERBASE" });
  *   await stagehand.init();
- *   return { navigate, act, extract, screenshot, currentUrl, close };
+ *   const page = stagehand.context.pages()[0];
+ *
+ *   return {
+ *     navigate: (url, opts) => page.goto(url, opts),
+ *     act: (instruction) => stagehand.act(instruction),
+ *     extract: (instruction, schema) => stagehand.extract(instruction, schema),
+ *     screenshot: (opts) => page.screenshot(opts),
+ *     currentUrl: () => Promise.resolve(page.url()),
+ *     close: () => stagehand.close(),
+ *   };
  * };
  * ```
  */
@@ -146,6 +152,36 @@ export type ExecutionResult = {
   outputs?: Record<string, unknown>;
   error?: string;
   tileResults?: TileResult[];
+};
+
+// ============================================================================
+// Compiler Types
+// ============================================================================
+
+/**
+ * Options for compiling a blueprint to code.
+ */
+export type CompileOptions = {
+  /** Function name for the generated executor. Default: "execute" */
+  functionName?: string;
+  /** Include tile labels as comments. Default: true */
+  includeComments?: boolean;
+  /** Indentation spaces. Default: 2 */
+  indentation?: number;
+};
+
+/**
+ * Result of compiling a blueprint to code.
+ */
+export type CompiledBlueprint = {
+  /** Generated TypeScript code */
+  code: string;
+  /** Name of the generated function */
+  functionName: string;
+  /** Variables used in {{interpolation}} patterns */
+  inputVariables: string[];
+  /** Variables produced by EXTRACT tiles */
+  outputVariables: string[];
 };
 
 // ============================================================================
