@@ -1,6 +1,6 @@
 {
   "name": "@trestleinc/crane",
-  "version": "0.0.1",
+  "version": "0.0.2-preview.0",
   "description": "Browser automation engine with integrated credential vault",
   "repository": "https://github.com/trestleinc/crane",
   "homepage": "https://github.com/trestleinc/crane#readme",
