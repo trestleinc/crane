@@ -53,6 +53,12 @@
         "default": "./dist/server.js"
       }
     },
+    "./handler": {
+      "import": {
+        "types": "./dist/handler/index.d.ts",
+        "default": "./dist/handler.js"
+      }
+    },
     "./convex.config": {
       "import": {
         "@convex-dev/component-source": "./src/component/convex.config.ts",

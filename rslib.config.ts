@@ -66,7 +66,8 @@ export default defineConfig({
       },
     },
     {
-      // Server (Convex backend) - BUNDLED (default mode)
+      // Server (Convex user space) - BUNDLED
+      // NO Node.js dependencies - runs in Convex runtime
       id: 'server',
       format: 'esm',
       syntax: 'es2022',
@@ -85,7 +86,32 @@ export default defineConfig({
       },
       source: {
         entry: {
-          server: './src/server/index.ts', // ← Exports all server utilities
+          server: './src/server/index.ts',
+        },
+      },
+    },
+    {
+      // Handler (Node.js API endpoints) - BUNDLED
+      // HAS Node.js dependencies - runs in framework server (TanStack, Next, etc)
+      id: 'handler',
+      format: 'esm',
+      syntax: 'es2022',
+      dts: true,
+      shims: {
+        esm: {
+          __dirname: true,
+          __filename: true,
+        },
+      },
+      output: {
+        distPath: {
+          root: './dist',
+        },
+        externals: ['@browserbasehq/stagehand', 'convex/server', 'convex/values'],
+      },
+      source: {
+        entry: {
+          handler: './src/handler/index.ts',
         },
       },
     },
