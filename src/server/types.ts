@@ -145,26 +145,13 @@ export type BrowserbaseConfig = {
 
 /**
  * Model configuration for Stagehand AI operations.
+ * Model name should be in provider/model format (e.g., 'google/gemini-2.5-pro').
  */
 export type ModelConfig = {
-  /** Model name (default: 'gpt-4o') */
-  name?: string;
-  /** Model provider (default: 'openai') */
-  provider?: string;
-};
-
-/**
- * Execution mode configuration.
- */
-export type ExecutionConfig = {
-  /** Execution mode: 'internal' runs in Convex, 'external' POSTs to endpoint */
-  mode: 'internal' | 'external';
-  /** Browserbase config (required for both modes) */
-  browserbase: BrowserbaseConfig;
-  /** Model config for Stagehand AI (optional) */
-  model?: ModelConfig;
-  /** External endpoint URL (required for 'external' mode) */
-  endpoint?: string;
+  /** Model name in provider/model format (e.g., 'google/gemini-2.5-pro') */
+  name: string;
+  /** API key for the model provider */
+  apiKey: string;
 };
 
 /**

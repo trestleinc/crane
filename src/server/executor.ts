@@ -1,27 +1,21 @@
-/**
- * @trestleinc/crane - External Executor
- *
- * Standalone executor for running blueprints outside Convex.
- * Use this in HTTP routes (TanStack Start, Express, etc.) for proven execution.
- */
+'use node';
+// IMPORTANT: "use node" directive - can only be imported in other "use node" files
 
-import type { Blueprint, Tile } from '../shared/types.js';
+import type { Blueprint, Tile } from '$/shared/types.js';
 import type {
   Adapter,
   CredentialResolver,
   ExecutionResult,
-  ExecutorConfig,
   TileResult,
-} from './types.js';
+  BrowserbaseConfig,
+  ModelConfig,
+} from '$/server/types.js';
 
-// ============================================================================
-// Utilities
-// ============================================================================
+export type DirectExecutorConfig = {
+  browserbase: BrowserbaseConfig;
+  model?: ModelConfig;
+};
 
-/**
- * Interpolate variables in a string template.
- * Replaces {{variable}} with actual values.
- */
 function interpolate(template: string, variables: Record<string, unknown>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     const value = variables[key];
@@ -29,9 +23,6 @@ function interpolate(template: string, variables: Record<string, unknown>): stri
   });
 }
 
-/**
- * Sort tiles by their connection order (start to end).
- */
 function sortTiles(tiles: Tile[]): Tile[] {
   const startTile = tiles.find((t) => t.connections.input === null);
   if (!startTile) return tiles;
@@ -54,13 +45,6 @@ function sortTiles(tiles: Tile[]): Tile[] {
   return sorted;
 }
 
-// ============================================================================
-// Tile Execution
-// ============================================================================
-
-/**
- * Execute a single tile.
- */
 async function executeTile(
   tile: Tile,
   adapter: Adapter,
@@ -74,7 +58,8 @@ async function executeTile(
       case 'NAVIGATE': {
         const url = interpolate(tile.parameters.url as string, variables);
         await adapter.navigate(url, {
-          waitUntil: (tile.parameters.waitUntil as 'load' | 'domcontentloaded' | 'networkidle') ?? 'load',
+          waitUntil:
+            (tile.parameters.waitUntil as 'load' | 'domcontentloaded' | 'networkidle') ?? 'load',
           timeout: (tile.parameters.timeout as number) ?? 30000,
         });
         return {
@@ -117,7 +102,12 @@ async function executeTile(
             };
           }
           const field = tile.parameters.credentialField as string;
-          value = field === 'username' ? cred.username : field === 'password' ? cred.password : (cred.fields?.[field] ?? '');
+          value =
+            field === 'username'
+              ? cred.username
+              : field === 'password'
+                ? cred.password
+                : (cred.fields?.[field] ?? '');
         } else {
           value = '';
         }
@@ -155,8 +145,9 @@ async function executeTile(
           };
         }
 
-        // Try common login patterns
-        const usernameResult = await adapter.act(`Type "${cred.username}" into the username or email field`);
+        const usernameResult = await adapter.act(
+          `Type "${cred.username}" into the username or email field`
+        );
         if (!usernameResult.success) {
           return {
             tileId: tile.id,
@@ -281,134 +272,117 @@ async function executeTile(
   }
 }
 
-// ============================================================================
-// External Executor
-// ============================================================================
-
 /**
- * Create an executor for running blueprints outside Convex.
- *
+ * Run a blueprint directly in a Convex Node.js action using Stagehand + Browserbase.
  * @example
- * ```typescript
- * // src/routes/api/execute.ts (TanStack Start)
- * import { createExecutor } from '@trestleinc/crane/server';
- *
- * const executor = createExecutor({
- *   browserbase: {
- *     apiKey: process.env.BROWSERBASE_API_KEY!,
- *     projectId: process.env.BROWSERBASE_PROJECT_ID!,
- *   },
- * });
- *
- * export async function POST(request: Request) {
- *   const { blueprint, variables, executionId } = await request.json();
- *   const result = await executor.run(blueprint, variables);
- *   return Response.json(result);
- * }
- * ```
+ * const result = await runBlueprintDirect(
+ *   { browserbase: { apiKey: '...', projectId: '...' }, model: { name: 'gpt-4o' } },
+ *   blueprint,
+ *   { firstName: 'John' }
+ * );
  */
-export function createExecutor(config: ExecutorConfig) {
-  return {
-    /**
-     * Run a blueprint with Stagehand.
-     *
-     * @param blueprint - The blueprint to execute
-     * @param variables - Variables for tile interpolation
-     * @param credentials - Optional credential resolver for AUTH tiles
-     * @returns Execution result with outputs
-     */
-    run: async (
-      blueprint: Blueprint,
-      variables: Record<string, unknown>,
-      credentials?: CredentialResolver
-    ): Promise<ExecutionResult> => {
-      const startTime = Date.now();
-      const tileResults: TileResult[] = [];
-      const outputs: Record<string, unknown> = {};
+export async function runBlueprintDirect(
+  config: DirectExecutorConfig,
+  blueprint: Blueprint,
+  variables: Record<string, unknown>,
+  credentials?: CredentialResolver
+): Promise<ExecutionResult> {
+  const startTime = Date.now();
+  const tileResults: TileResult[] = [];
+  const outputs: Record<string, unknown> = {};
 
-      // Dynamic import of Stagehand (peer dependency)
-      const { Stagehand } = await import('@browserbasehq/stagehand');
+  const { Stagehand } = await import('@browserbasehq/stagehand');
 
-      const stagehand = new Stagehand({
-        env: 'BROWSERBASE',
-        apiKey: config.browserbase.apiKey,
-        projectId: config.browserbase.projectId,
-        // Model can be a string like 'gpt-4o' or ClientOptions with modelName
-        model: config.model?.name as any,
-      });
+  const modelName = config.model?.name ?? 'google/gemini-2.5-pro';
+  const modelApiKey = config.model?.apiKey;
 
-      await stagehand.init();
-      const page = stagehand.context.pages()[0];
+  if (modelApiKey) {
+    const provider = modelName.split('/')[0];
+    if (provider === 'google') {
+      process.env.GEMINI_API_KEY = modelApiKey;
+    } else if (provider === 'openai') {
+      process.env.OPENAI_API_KEY = modelApiKey;
+    } else if (provider === 'anthropic') {
+      process.env.ANTHROPIC_API_KEY = modelApiKey;
+    }
+  }
 
-      // Build adapter from Stagehand
-      const adapter: Adapter = {
-        navigate: async (url, opts) => {
-          await page.goto(url, opts);
-        },
-        act: async (instruction) => {
-          try {
-            const result = await stagehand.act(instruction);
-            return { success: result.success, message: result.message };
-          } catch (error) {
-            return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
-          }
-        },
-        extract: async (instruction, schema) => {
-          if (schema) {
-            return stagehand.extract(instruction, schema as any);
-          }
-          const result = await stagehand.extract(instruction);
-          return result.extraction as any;
-        },
-        screenshot: async (opts) => {
-          const buffer = await page.screenshot({ fullPage: opts?.fullPage });
-          return new Uint8Array(buffer);
-        },
-        currentUrl: async () => page.url(),
-        close: async () => {
-          await stagehand.close();
-        },
-      };
+  const stagehand = new Stagehand({
+    env: 'BROWSERBASE',
+    apiKey: config.browserbase.apiKey,
+    projectId: config.browserbase.projectId,
+    model: modelName as any,
+  });
 
+  await stagehand.init();
+  const page = stagehand.context.pages()[0];
+
+  const adapter: Adapter = {
+    navigate: async (url, opts) => {
+      await page.goto(url, opts);
+    },
+    act: async (instruction) => {
       try {
-        // Sort and execute tiles
-        const sortedTiles = sortTiles(blueprint.tiles);
-
-        for (const tile of sortedTiles) {
-          const tileResult = await executeTile(
-            tile,
-            adapter,
-            { ...variables, ...outputs },
-            credentials
-          );
-
-          tileResults.push(tileResult);
-
-          // Store extracted outputs
-          if (tileResult.status === 'completed' && tile.type === 'EXTRACT') {
-            const outputVar = tile.parameters.outputVariable as string;
-            if (outputVar) {
-              outputs[outputVar] = tileResult.result;
-            }
-          }
-
-          // Stop on failure
-          if (tileResult.status === 'failed') {
-            break;
-          }
-        }
-
-        const success = tileResults.every((r) => r.status === 'completed');
+        const result = await stagehand.act(instruction);
+        return { success: result.success, message: result.message };
+      } catch (error) {
         return {
-          success,
-          duration: Date.now() - startTime,
-          outputs: success ? outputs : undefined,
-          error: success ? undefined : tileResults.find((r) => r.status === 'failed')?.error,
-          tileResults,
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error',
         };
-      } finally {
-        await adapter.close().catch(() => {});
       }
     },
+    extract: async (instruction, schema) => {
+      if (schema) {
+        return stagehand.extract(instruction, schema as any);
+      }
+      const result = await stagehand.extract(instruction);
+      return result.extraction as any;
+    },
+    screenshot: async (opts) => {
+      const buffer = await page.screenshot({ fullPage: opts?.fullPage });
+      return new Uint8Array(buffer);
+    },
+    currentUrl: async () => page.url(),
+    close: async () => {
+      await stagehand.close();
+    },
   };
+
+  try {
+    const sortedTiles = sortTiles(blueprint.tiles);
+
+    for (const tile of sortedTiles) {
+      const tileResult = await executeTile(
+        tile,
+        adapter,
+        { ...variables, ...outputs },
+        credentials
+      );
+
+      tileResults.push(tileResult);
+
+      if (tileResult.status === 'completed' && tile.type === 'EXTRACT') {
+        const outputVar = tile.parameters.outputVariable as string;
+        if (outputVar) {
+          outputs[outputVar] = tileResult.result;
+        }
+      }
+
+      if (tileResult.status === 'failed') {
+        break;
+      }
+    }
+
+    const success = tileResults.every((r) => r.status === 'completed');
+    return {
+      success,
+      duration: Date.now() - startTime,
+      outputs: success ? outputs : undefined,
+      error: success ? undefined : tileResults.find((r) => r.status === 'failed')?.error,
+      tileResults,
+    };
+  } finally {
+    await adapter.close().catch(() => {});
+  }
 }
