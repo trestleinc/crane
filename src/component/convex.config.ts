@@ -1,5 +1,5 @@
 import { defineComponent } from 'convex/server';
 
-const component = defineComponent('bridge');
+const component = defineComponent('crane');
 
 export default component;

@@ -1,34 +1,27 @@
 /**
  * @trestleinc/crane - Server exports
  *
- * Import from '@trestleinc/crane/server' to use in Convex functions.
+ * Import from '@trestleinc/crane/server' for Convex user space code.
+ * This runs in Convex runtime - NO Node.js dependencies allowed.
+ *
+ * For Node.js API endpoints, use '@trestleinc/crane/handler' instead.
  */
 
-// Convex component binding
+// Convex component binding (no Node.js dependencies)
 export { crane } from "$/server/builder.js";
 export type { CraneConfig } from "$/server/builder.js";
-
-// External executor (for HTTP routes)
-export { createExecutor } from "$/server/executor.js";
 
 // Compiler (works anywhere)
 export { compile } from "$/server/compiler.js";
 
-// Types
+// Types (no runtime deps)
 export type {
-  Adapter,
-  AdapterFactory,
   CredentialResolver,
   ResolvedCredential,
   ExecuteOptions,
   ExecutionResult,
-  ExecutorConfig,
   TileResult,
-  M2MClaims,
   CompileOptions,
   CompiledBlueprint,
-  BrowserbaseConfig,
-  ModelConfig,
-  ExecutionConfig,
   CredentialConfig,
 } from "$/server/types.js";
