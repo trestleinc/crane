@@ -155,6 +155,7 @@ await ctx.runMutation(c.credentials.create, args);
 - `c.api.vault.*` → `c.vault.*`
 - `evalRemove` now receives full document instead of just ID
 - `onRemove` now receives full document instead of just ID
+- **Shared types/validators now import from `@trestleinc/crane/shared`** (consolidated single source)
 
 ### New Features
 - `beforeUpdate` hook for modifying updates before application
@@ -162,6 +163,7 @@ await ctx.runMutation(c.credentials.create, args);
 - Type-safe `CraneComponentApi` type (no more `any`)
 - Custom error classes: `NotFoundError`, `ValidationError`, `AuthorizationError`
 - Full document access in removal hooks for better context
+- All validators and types consolidated in `@trestleinc/crane/shared`
 
 ## Core Concepts
 
@@ -643,6 +645,67 @@ try {
 All errors extend `CraneError` which includes a `code` property for programmatic handling.
 
 ## Type Exports
+
+### Shared (`@trestleinc/crane/shared`)
+
+All validators and types are consolidated in a single source of truth. Types are derived from validators using `Infer<typeof validator>`.
+
+```typescript
+import {
+  // Validators
+  tileTypeValidator,
+  executionStatusValidator,
+  blueprintDocValidator,
+  executionDocValidator,
+  credentialDocValidator,
+  vaultDocValidator,
+  tileValidator,
+  metadataValidator,
+  // ... and more
+
+  // Types (derived from validators)
+  type Blueprint,
+  type Execution,
+  type Credential,
+  type Vault,
+  type Tile,
+  type TileType,
+  type ExecutionStatus,
+  type Metadata,
+  type TileResult,
+  type ExecutionResult,
+  // ... and more
+
+  // Branded IDs for type safety
+  type BlueprintId,
+  type ExecutionId,
+  type CredentialId,
+  type OrganizationId,
+
+  // ID factory
+  createId,
+} from '@trestleinc/crane/shared';
+
+// Usage
+const blueprintId = createId.blueprint('bp_123');
+const orgId = createId.organization('org_456');
+```
+
+**Available Validators:**
+- `tileTypeValidator`, `executionStatusValidator`, `tileStatusValidator`, `fieldTypeValidator`
+- `tileValidator`, `tilePositionValidator`, `tileConnectionsValidator`
+- `blueprintDocValidator`, `executionDocValidator`, `credentialDocValidator`, `vaultDocValidator`
+- `blueprintInputValidator`, `blueprintUpdateValidator`
+- `executionInputValidator`, `executionResultValidator`, `tileResultValidator`
+- `credentialInputValidator`, `credentialUpdateValidator`
+- `vaultSetupInputValidator`, `vaultEnableInputValidator`
+- `listOptionsValidator`, `blueprintListOptionsValidator`, `executionListOptionsValidator`, `credentialListOptionsValidator`
+
+**Available Types:**
+- Document types: `Blueprint`, `Execution`, `Credential`, `Vault`
+- Core types: `Tile`, `TileType`, `ExecutionStatus`, `TileStatus`, `Metadata`, `TileResult`, `ExecutionResult`, `Artifact`
+- Input types: `BlueprintInput`, `BlueprintUpdate`, `ExecutionInput`, `CredentialInput`, `CredentialUpdate`, `VaultSetupInput`, `VaultEnableInput`
+- Branded IDs: `BlueprintId`, `ExecutionId`, `CredentialId`, `OrganizationId`
 
 ### Server (`@trestleinc/crane/server`)
 
