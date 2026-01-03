@@ -4,42 +4,48 @@
  * Import from '@trestleinc/crane/client' for client-side utilities.
  */
 
-// Blueprint builder
-export { blueprint } from '$/client/blueprint.js';
 export type {
-  Blueprint,
-  BlueprintDraft,
-  Tile,
-  TileType,
-  InputField,
-  TypeOptions,
-  FormField,
-  ScreenshotOptions,
-} from '$/client/blueprint.js';
+	Blueprint,
+	BlueprintDraft,
+	FormField,
+	InputField,
+	ScreenshotOptions,
+	Tile,
+	TileType,
+	TypeOptions,
+} from "$/client/blueprint";
+export { blueprint } from "$/client/blueprint";
 
-// Vault operations
-export { vault } from '$/client/vault.js';
-export type {
-  VaultData,
-  VaultKey,
-  CredentialInput,
-  EncryptedPayload,
-  DecryptedCredential,
-} from '$/client/vault.js';
-
-// Error types
 export {
-  NetworkError,
-  AuthorizationError,
-  NotFoundError,
-  ValidationError,
-  VaultUnlockError,
-  CredentialNotFoundError,
-  NonRetriableError,
-} from '$/client/errors.js';
+	AuthorizationError,
+	CredentialNotFoundError,
+	NetworkError,
+	NonRetriableError,
+	NotFoundError,
+	ValidationError,
+	VaultUnlockError,
+} from "$/client/errors";
 
-// Logger utility
-export { getLogger } from '$/client/logger.js';
+export { getLogger } from "$/client/logger";
 
-// Re-export shared types and validators for convenience
-export * from '$/shared/index.js';
+export type {
+	CredentialInput,
+	DecryptedCredential,
+	EncryptedPayload,
+	VaultData,
+	VaultKey,
+} from "$/client/vault";
+export { vault } from "$/client/vault";
+
+export type {
+	CredentialHooks,
+	CredentialOptions,
+	ExecutionHooks,
+	ExecutionOptions,
+	ResourceHooks,
+	ResourceOptions,
+	VaultHooks,
+	VaultOptions,
+} from "$/server/resource";
+
+export * from "$/shared/index";

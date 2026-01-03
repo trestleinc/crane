@@ -1,27 +1,48 @@
-/**
- * @trestleinc/crane - Server exports
- *
- * Import from '@trestleinc/crane/server' for Convex user space code.
- * This runs in Convex runtime - NO Node.js dependencies allowed.
- *
- * For Node.js API endpoints, use '@trestleinc/crane/handler' instead.
- */
+export type { CraneConfig } from "$/server/builder";
+export { crane as craneLegacy } from "$/server/builder";
+export { compile } from "$/server/compiler";
+export type { CraneComponentApi, CraneOptions } from "$/server/crane";
+export { crane } from "$/server/crane";
+export {
+	AuthorizationError,
+	CraneError,
+	NotFoundError,
+	ValidationError,
+} from "$/server/errors";
 
-// Convex component binding (no Node.js dependencies)
-export { crane } from "$/server/builder.js";
-export type { CraneConfig } from "$/server/builder.js";
-
-// Compiler (works anywhere)
-export { compile } from "$/server/compiler.js";
-
-// Types (no runtime deps)
 export type {
-  CredentialResolver,
-  ResolvedCredential,
-  ExecuteOptions,
-  ExecutionResult,
-  TileResult,
-  CompileOptions,
-  CompiledBlueprint,
-  CredentialConfig,
-} from "$/server/types.js";
+	CredentialHooks,
+	CredentialOptions,
+	ExecutionHooks,
+	ExecutionOptions,
+	ResourceHooks,
+	ResourceOptions,
+	VaultHooks,
+	VaultOptions,
+} from "$/server/resource";
+
+export type {
+	Adapter,
+	AdapterFactory,
+	CompiledBlueprint,
+	CompileOptions,
+	CredentialConfig,
+	CredentialResolver,
+	ExecuteOptions,
+	ExecutionResult,
+	ResolvedCredential,
+	TileResult,
+} from "$/server/types";
+export type {
+	WorkflowExecuteOptions,
+	WorkflowExecutorConfig,
+	WorkflowId,
+	WorkflowStatus,
+} from "$/server/workflow";
+export {
+	createWorkflowExecutor,
+	interpolate,
+	sortTiles,
+	tileStepArgs,
+	workflowArgs,
+} from "$/server/workflow";

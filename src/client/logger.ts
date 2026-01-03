@@ -1,5 +1,5 @@
-import { type Logger, getLogger as getLogTapeLogger } from '@logtape/logtape';
+import { getLogger as getLogTapeLogger, type Logger } from "@logtape/logtape";
 
 export function getLogger(category: string[]): Logger {
-  return getLogTapeLogger(['crane', ...category]);
+	return getLogTapeLogger(["crane", ...category]);
 }

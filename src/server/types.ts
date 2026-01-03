@@ -28,26 +28,29 @@
  * ```
  */
 export type Adapter = {
-  /** Navigate to a URL */
-  navigate: (
-    url: string,
-    options?: { waitUntil?: 'load' | 'domcontentloaded' | 'networkidle'; timeout?: number }
-  ) => Promise<void>;
+	/** Navigate to a URL */
+	navigate: (
+		url: string,
+		options?: {
+			waitUntil?: "load" | "domcontentloaded" | "networkidle";
+			timeout?: number;
+		},
+	) => Promise<void>;
 
-  /** Perform an action described in natural language */
-  act: (instruction: string) => Promise<{ success: boolean; message?: string }>;
+	/** Perform an action described in natural language */
+	act: (instruction: string) => Promise<{ success: boolean; message?: string }>;
 
-  /** Extract data described in natural language */
-  extract: <T = unknown>(instruction: string, schema?: unknown) => Promise<T>;
+	/** Extract data described in natural language */
+	extract: <T = unknown>(instruction: string, schema?: unknown) => Promise<T>;
 
-  /** Capture a screenshot */
-  screenshot: (options?: { fullPage?: boolean }) => Promise<Uint8Array>;
+	/** Capture a screenshot */
+	screenshot: (options?: { fullPage?: boolean }) => Promise<Uint8Array>;
 
-  /** Get current URL */
-  currentUrl: () => Promise<string>;
+	/** Get current URL */
+	currentUrl: () => Promise<string>;
 
-  /** Close the browser session */
-  close: () => Promise<void>;
+	/** Close the browser session */
+	close: () => Promise<void>;
 };
 
 /**
@@ -74,10 +77,10 @@ export type Adapter = {
  * ```
  */
 export type AdapterFactory = (options: {
-  /** Blueprint being executed */
-  blueprintId: string;
-  /** Browserbase persistent context ID (optional) */
-  contextId?: string;
+	/** Blueprint being executed */
+	blueprintId: string;
+	/** Browserbase persistent context ID (optional) */
+	contextId?: string;
 }) => Promise<Adapter>;
 
 // ============================================================================
@@ -88,10 +91,10 @@ export type AdapterFactory = (options: {
  * Resolved credential for domain-based authentication.
  */
 export type ResolvedCredential = {
-  username: string;
-  password: string;
-  /** Additional fields for complex login forms */
-  fields?: Record<string, string>;
+	username: string;
+	password: string;
+	/** Additional fields for complex login forms */
+	fields?: Record<string, string>;
 };
 
 /**
@@ -106,7 +109,9 @@ export type ResolvedCredential = {
  * };
  * ```
  */
-export type CredentialResolver = (domain: string) => Promise<ResolvedCredential | null>;
+export type CredentialResolver = (
+	domain: string,
+) => Promise<ResolvedCredential | null>;
 
 // ============================================================================
 // Execution Types
@@ -117,16 +122,23 @@ export type CredentialResolver = (domain: string) => Promise<ResolvedCredential 
  * Adapter and credentials come from CraneConfig, not passed here.
  */
 export type ExecuteOptions = {
-  /** Blueprint ID to execute */
-  blueprintId: string;
-  /** Variables for tile parameter interpolation */
-  variables: Record<string, unknown>;
-  /** App-specific context (deliverableId, beneficiaryId, etc.) */
-  context?: unknown;
-  /** Progress callback for tile status updates */
-  onProgress?: (tileId: string, status: 'running' | 'completed' | 'failed') => void;
-  /** Artifact callback for screenshots/files */
-  onArtifact?: (type: string, tileId: string, data: Uint8Array) => Promise<string>;
+	/** Blueprint ID to execute */
+	blueprintId: string;
+	/** Variables for tile parameter interpolation */
+	variables: Record<string, unknown>;
+	/** App-specific context (deliverableId, beneficiaryId, etc.) */
+	context?: unknown;
+	/** Progress callback for tile status updates */
+	onProgress?: (
+		tileId: string,
+		status: "running" | "completed" | "failed",
+	) => void;
+	/** Artifact callback for screenshots/files */
+	onArtifact?: (
+		type: string,
+		tileId: string,
+		data: Uint8Array,
+	) => Promise<string>;
 };
 
 // ============================================================================
@@ -137,10 +149,10 @@ export type ExecuteOptions = {
  * Browserbase configuration for Stagehand.
  */
 export type BrowserbaseConfig = {
-  /** Browserbase API key */
-  apiKey: string;
-  /** Browserbase project ID */
-  projectId: string;
+	/** Browserbase API key */
+	apiKey: string;
+	/** Browserbase project ID */
+	projectId: string;
 };
 
 /**
@@ -148,52 +160,52 @@ export type BrowserbaseConfig = {
  * Model name should be in provider/model format (e.g., 'google/gemini-2.5-pro').
  */
 export type ModelConfig = {
-  /** Model name in provider/model format (e.g., 'google/gemini-2.5-pro') */
-  name: string;
-  /** API key for the model provider */
-  apiKey: string;
+	/** Model name in provider/model format (e.g., 'google/gemini-2.5-pro') */
+	name: string;
+	/** API key for the model provider */
+	apiKey: string;
 };
 
 /**
  * Credential resolution configuration.
  */
 export type CredentialConfig = {
-  /** Table name with by_domain index for credential lookup */
-  table?: string;
-  /** Custom resolver function (alternative to table) */
-  resolver?: CredentialResolver;
+	/** Table name with by_domain index for credential lookup */
+	table?: string;
+	/** Custom resolver function (alternative to table) */
+	resolver?: CredentialResolver;
 };
 
 /**
  * Configuration for createExecutor (external HTTP execution).
  */
 export type ExecutorConfig = {
-  /** Browserbase configuration */
-  browserbase: BrowserbaseConfig;
-  /** Model configuration */
-  model?: ModelConfig;
+	/** Browserbase configuration */
+	browserbase: BrowserbaseConfig;
+	/** Model configuration */
+	model?: ModelConfig;
 };
 
 /**
  * Result of tile execution.
  */
 export type TileResult = {
-  tileId: string;
-  status: 'completed' | 'failed';
-  result?: unknown;
-  error?: string;
-  duration?: number;
+	tileId: string;
+	status: "completed" | "failed";
+	result?: unknown;
+	error?: string;
+	duration?: number;
 };
 
 /**
  * Result of blueprint execution.
  */
 export type ExecutionResult = {
-  success: boolean;
-  duration?: number;
-  outputs?: Record<string, unknown>;
-  error?: string;
-  tileResults?: TileResult[];
+	success: boolean;
+	duration?: number;
+	outputs?: Record<string, unknown>;
+	error?: string;
+	tileResults?: TileResult[];
 };
 
 // ============================================================================
@@ -204,26 +216,26 @@ export type ExecutionResult = {
  * Options for compiling a blueprint to code.
  */
 export type CompileOptions = {
-  /** Function name for the generated executor. Default: "execute" */
-  functionName?: string;
-  /** Include tile labels as comments. Default: true */
-  includeComments?: boolean;
-  /** Indentation spaces. Default: 2 */
-  indentation?: number;
+	/** Function name for the generated executor. Default: "execute" */
+	functionName?: string;
+	/** Include tile labels as comments. Default: true */
+	includeComments?: boolean;
+	/** Indentation spaces. Default: 2 */
+	indentation?: number;
 };
 
 /**
  * Result of compiling a blueprint to code.
  */
 export type CompiledBlueprint = {
-  /** Generated TypeScript code */
-  code: string;
-  /** Name of the generated function */
-  functionName: string;
-  /** Variables used in {{interpolation}} patterns */
-  inputVariables: string[];
-  /** Variables produced by EXTRACT tiles */
-  outputVariables: string[];
+	/** Generated TypeScript code */
+	code: string;
+	/** Name of the generated function */
+	functionName: string;
+	/** Variables used in {{interpolation}} patterns */
+	inputVariables: string[];
+	/** Variables produced by EXTRACT tiles */
+	outputVariables: string[];
 };
 
 // ============================================================================
@@ -234,11 +246,11 @@ export type CompiledBlueprint = {
  * Claims from WorkOS M2M JWT token.
  */
 export type M2MClaims = {
-  sub: string;
-  iss: string;
-  aud?: string | string[];
-  exp: number;
-  iat: number;
-  org_id?: string;
-  permissions?: string[];
+	sub: string;
+	iss: string;
+	aud?: string | string[];
+	exp: number;
+	iat: number;
+	org_id?: string;
+	permissions?: string[];
 };

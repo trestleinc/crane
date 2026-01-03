@@ -5,18 +5,18 @@
  * Generated code uses the Adapter abstraction and can run independently.
  */
 
-import type { Blueprint, Tile } from "../shared/types.js";
-import type { CompileOptions, CompiledBlueprint } from "./types.js";
+import type { Blueprint, Tile } from "../shared/types";
+import type { CompiledBlueprint, CompileOptions } from "./types";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 type GeneratorContext = {
-  includeComments: boolean;
-  indentation: number;
-  inputVars: Set<string>;
-  outputVars: Set<string>;
+	includeComments: boolean;
+	indentation: number;
+	inputVars: Set<string>;
+	outputVars: Set<string>;
 };
 
 // ============================================================================
@@ -27,58 +27,58 @@ type GeneratorContext = {
  * Extract {{variable}} patterns from a template string.
  */
 function extractVariables(template: string, vars: Set<string>): void {
-  const matches = template.matchAll(/\{\{(\w+)\}\}/g);
-  for (const match of matches) {
-    vars.add(match[1]);
-  }
+	const matches = template.matchAll(/\{\{(\w+)\}\}/g);
+	for (const match of matches) {
+		vars.add(match[1]);
+	}
 }
 
 /**
  * Escape string for use in generated code.
  */
 function escapeString(str: string): string {
-  return str
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
+	return str
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"')
+		.replace(/\n/g, "\\n")
+		.replace(/\r/g, "\\r")
+		.replace(/\t/g, "\\t");
 }
 
 /**
  * Indent code block.
  */
 function indent(code: string, level: number, spaces: number): string {
-  const prefix = " ".repeat(level * spaces);
-  return code
-    .split("\n")
-    .map((line) => (line.trim() ? prefix + line : line))
-    .join("\n");
+	const prefix = " ".repeat(level * spaces);
+	return code
+		.split("\n")
+		.map((line) => (line.trim() ? prefix + line : line))
+		.join("\n");
 }
 
 /**
  * Sort tiles by their connection order (start to end).
  */
 function sortTiles(tiles: Tile[]): Tile[] {
-  const startTile = tiles.find((t) => t.connections.input === null);
-  if (!startTile) return tiles;
+	const startTile = tiles.find((t) => t.connections.input === null);
+	if (!startTile) return tiles;
 
-  const sorted: Tile[] = [];
-  const visited = new Set<string>();
-  let current: Tile | undefined = startTile;
+	const sorted: Tile[] = [];
+	const visited = new Set<string>();
+	let current: Tile | undefined = startTile;
 
-  while (current && !visited.has(current.id)) {
-    sorted.push(current);
-    visited.add(current.id);
-    const nextId: string | null = current.connections.output;
-    if (nextId) {
-      current = tiles.find((t) => t.id === nextId);
-    } else {
-      break;
-    }
-  }
+	while (current && !visited.has(current.id)) {
+		sorted.push(current);
+		visited.add(current.id);
+		const nextId: string | null = current.connections.output;
+		if (nextId) {
+			current = tiles.find((t) => t.id === nextId);
+		} else {
+			break;
+		}
+	}
 
-  return sorted;
+	return sorted;
 }
 
 // ============================================================================
@@ -86,27 +86,31 @@ function sortTiles(tiles: Tile[]): Tile[] {
 // ============================================================================
 
 function generateNavigate(tile: Tile, ctx: GeneratorContext): string {
-  const url = tile.parameters.url as string;
-  const waitUntil = tile.parameters.waitUntil as string | undefined;
-  const timeout = tile.parameters.timeout as number | undefined;
+	const url = tile.parameters.url as string;
+	const waitUntil = tile.parameters.waitUntil as string | undefined;
+	const timeout = tile.parameters.timeout as number | undefined;
 
-  extractVariables(url, ctx.inputVars);
+	extractVariables(url, ctx.inputVars);
 
-  const opts: string[] = [];
-  if (waitUntil) opts.push(`waitUntil: "${waitUntil}"`);
-  if (timeout) opts.push(`timeout: ${timeout}`);
-  const optsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+	const opts: string[] = [];
+	if (waitUntil) opts.push(`waitUntil: "${waitUntil}"`);
+	if (timeout) opts.push(`timeout: ${timeout}`);
+	const optsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
 
-  const comment = ctx.includeComments ? `  // NAVIGATE: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  await adapter.navigate(interpolate("${escapeString(url)}", variables)${optsStr});`;
+	const comment = ctx.includeComments
+		? `  // NAVIGATE: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  await adapter.navigate(interpolate("${escapeString(url)}", variables)${optsStr});`;
 }
 
 function generateClick(tile: Tile, ctx: GeneratorContext): string {
-  const instruction = tile.parameters.instruction as string;
-  extractVariables(instruction, ctx.inputVars);
+	const instruction = tile.parameters.instruction as string;
+	extractVariables(instruction, ctx.inputVars);
 
-  const comment = ctx.includeComments ? `  // CLICK: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  {
+	const comment = ctx.includeComments
+		? `  // CLICK: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  {
     const result = await adapter.act(\`Click on \${interpolate("${escapeString(instruction)}", variables)}\`);
     if (!result.success) {
       throw new Error(\`CLICK failed: \${result.message}\`);
@@ -115,19 +119,21 @@ function generateClick(tile: Tile, ctx: GeneratorContext): string {
 }
 
 function generateType(tile: Tile, ctx: GeneratorContext): string {
-  const instruction = tile.parameters.instruction as string;
-  const value = tile.parameters.value as string | undefined;
-  const variable = tile.parameters.variable as string | undefined;
-  const credentialField = tile.parameters.credentialField as string | undefined;
+	const instruction = tile.parameters.instruction as string;
+	const value = tile.parameters.value as string | undefined;
+	const variable = tile.parameters.variable as string | undefined;
+	const credentialField = tile.parameters.credentialField as string | undefined;
 
-  extractVariables(instruction, ctx.inputVars);
-  if (value) extractVariables(value, ctx.inputVars);
-  if (variable) ctx.inputVars.add(variable);
+	extractVariables(instruction, ctx.inputVars);
+	if (value) extractVariables(value, ctx.inputVars);
+	if (variable) ctx.inputVars.add(variable);
 
-  const comment = ctx.includeComments ? `  // TYPE: ${escapeString(tile.label)}\n` : "";
+	const comment = ctx.includeComments
+		? `  // TYPE: ${escapeString(tile.label)}\n`
+		: "";
 
-  if (credentialField) {
-    return `${comment}  {
+	if (credentialField) {
+		return `${comment}  {
     const currentUrl = await adapter.currentUrl();
     const domain = new URL(currentUrl).hostname;
     const cred = await credentials?.(domain);
@@ -140,29 +146,29 @@ function generateType(tile: Tile, ctx: GeneratorContext): string {
       throw new Error(\`TYPE failed: \${result.message}\`);
     }
   }`;
-  }
+	}
 
-  if (variable) {
-    return `${comment}  {
+	if (variable) {
+		return `${comment}  {
     const value = String(variables["${escapeString(variable)}"] ?? "");
     const result = await adapter.act(\`Type "\${value}" into \${interpolate("${escapeString(instruction)}", variables)}\`);
     if (!result.success) {
       throw new Error(\`TYPE failed: \${result.message}\`);
     }
   }`;
-  }
+	}
 
-  if (value) {
-    return `${comment}  {
+	if (value) {
+		return `${comment}  {
     const value = interpolate("${escapeString(value)}", variables);
     const result = await adapter.act(\`Type "\${value}" into \${interpolate("${escapeString(instruction)}", variables)}\`);
     if (!result.success) {
       throw new Error(\`TYPE failed: \${result.message}\`);
     }
   }`;
-  }
+	}
 
-  return `${comment}  {
+	return `${comment}  {
     const result = await adapter.act(\`Type "" into \${interpolate("${escapeString(instruction)}", variables)}\`);
     if (!result.success) {
       throw new Error(\`TYPE failed: \${result.message}\`);
@@ -171,8 +177,10 @@ function generateType(tile: Tile, ctx: GeneratorContext): string {
 }
 
 function generateAuth(tile: Tile, ctx: GeneratorContext): string {
-  const comment = ctx.includeComments ? `  // AUTH: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  {
+	const comment = ctx.includeComments
+		? `  // AUTH: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  {
     if (!credentials) {
       throw new Error("AUTH tile requires credential resolver");
     }
@@ -201,39 +209,47 @@ function generateAuth(tile: Tile, ctx: GeneratorContext): string {
 }
 
 function generateExtract(tile: Tile, ctx: GeneratorContext): string {
-  const instruction = tile.parameters.instruction as string;
-  const outputVariable = tile.parameters.outputVariable as string;
-  const schema = tile.parameters.schema;
+	const instruction = tile.parameters.instruction as string;
+	const outputVariable = tile.parameters.outputVariable as string;
+	const schema = tile.parameters.schema;
 
-  extractVariables(instruction, ctx.inputVars);
-  ctx.outputVars.add(outputVariable);
+	extractVariables(instruction, ctx.inputVars);
+	ctx.outputVars.add(outputVariable);
 
-  const schemaStr = schema ? `, ${JSON.stringify(schema)}` : "";
-  const comment = ctx.includeComments ? `  // EXTRACT: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  outputs["${escapeString(outputVariable)}"] = await adapter.extract(interpolate("${escapeString(instruction)}", variables)${schemaStr});`;
+	const schemaStr = schema ? `, ${JSON.stringify(schema)}` : "";
+	const comment = ctx.includeComments
+		? `  // EXTRACT: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  outputs["${escapeString(outputVariable)}"] = await adapter.extract(interpolate("${escapeString(instruction)}", variables)${schemaStr});`;
 }
 
 function generateScreenshot(tile: Tile, ctx: GeneratorContext): string {
-  const fullPage = tile.parameters.fullPage as boolean | undefined;
-  const comment = ctx.includeComments ? `  // SCREENSHOT: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  await adapter.screenshot({ fullPage: ${fullPage ?? false} });`;
+	const fullPage = tile.parameters.fullPage as boolean | undefined;
+	const comment = ctx.includeComments
+		? `  // SCREENSHOT: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  await adapter.screenshot({ fullPage: ${fullPage ?? false} });`;
 }
 
 function generateWait(tile: Tile, ctx: GeneratorContext): string {
-  const ms = tile.parameters.ms as number;
-  const comment = ctx.includeComments ? `  // WAIT: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  await new Promise(resolve => setTimeout(resolve, ${ms}));`;
+	const ms = tile.parameters.ms as number;
+	const comment = ctx.includeComments
+		? `  // WAIT: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  await new Promise(resolve => setTimeout(resolve, ${ms}));`;
 }
 
 function generateSelect(tile: Tile, ctx: GeneratorContext): string {
-  const instruction = tile.parameters.instruction as string;
-  const value = tile.parameters.value as string;
+	const instruction = tile.parameters.instruction as string;
+	const value = tile.parameters.value as string;
 
-  extractVariables(instruction, ctx.inputVars);
-  extractVariables(value, ctx.inputVars);
+	extractVariables(instruction, ctx.inputVars);
+	extractVariables(value, ctx.inputVars);
 
-  const comment = ctx.includeComments ? `  // SELECT: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  {
+	const comment = ctx.includeComments
+		? `  // SELECT: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  {
     const result = await adapter.act(\`Select "\${interpolate("${escapeString(value)}", variables)}" from \${interpolate("${escapeString(instruction)}", variables)}\`);
     if (!result.success) {
       throw new Error(\`SELECT failed: \${result.message}\`);
@@ -242,28 +258,28 @@ function generateSelect(tile: Tile, ctx: GeneratorContext): string {
 }
 
 function generateForm(tile: Tile, ctx: GeneratorContext): string {
-  const fields = tile.parameters.fields as Array<{
-    instruction: string;
-    value?: string;
-    variable?: string;
-  }>;
+	const fields = tile.parameters.fields as Array<{
+		instruction: string;
+		value?: string;
+		variable?: string;
+	}>;
 
-  const fieldCode = fields
-    .map((field, i) => {
-      extractVariables(field.instruction, ctx.inputVars);
-      if (field.value) extractVariables(field.value, ctx.inputVars);
-      if (field.variable) ctx.inputVars.add(field.variable);
+	const fieldCode = fields
+		.map((field, i) => {
+			extractVariables(field.instruction, ctx.inputVars);
+			if (field.value) extractVariables(field.value, ctx.inputVars);
+			if (field.variable) ctx.inputVars.add(field.variable);
 
-      let valueExpr: string;
-      if (field.value) {
-        valueExpr = `interpolate("${escapeString(field.value)}", variables)`;
-      } else if (field.variable) {
-        valueExpr = `String(variables["${escapeString(field.variable)}"] ?? "")`;
-      } else {
-        valueExpr = '""';
-      }
+			let valueExpr: string;
+			if (field.value) {
+				valueExpr = `interpolate("${escapeString(field.value)}", variables)`;
+			} else if (field.variable) {
+				valueExpr = `String(variables["${escapeString(field.variable)}"] ?? "")`;
+			} else {
+				valueExpr = '""';
+			}
 
-      return `    // Field ${i + 1}: ${escapeString(field.instruction)}
+			return `    // Field ${i + 1}: ${escapeString(field.instruction)}
     {
       const value = ${valueExpr};
       const result = await adapter.act(\`Type "\${value}" into \${interpolate("${escapeString(field.instruction)}", variables)}\`);
@@ -271,11 +287,13 @@ function generateForm(tile: Tile, ctx: GeneratorContext): string {
         throw new Error(\`FORM field "${escapeString(field.instruction)}" failed: \${result.message}\`);
       }
     }`;
-    })
-    .join("\n\n");
+		})
+		.join("\n\n");
 
-  const comment = ctx.includeComments ? `  // FORM: ${escapeString(tile.label)}\n` : "";
-  return `${comment}  {
+	const comment = ctx.includeComments
+		? `  // FORM: ${escapeString(tile.label)}\n`
+		: "";
+	return `${comment}  {
 ${fieldCode}
   }`;
 }
@@ -284,28 +302,28 @@ ${fieldCode}
  * Generate code for a single tile.
  */
 function generateTileCode(tile: Tile, ctx: GeneratorContext): string {
-  switch (tile.type) {
-    case "NAVIGATE":
-      return generateNavigate(tile, ctx);
-    case "CLICK":
-      return generateClick(tile, ctx);
-    case "TYPE":
-      return generateType(tile, ctx);
-    case "AUTH":
-      return generateAuth(tile, ctx);
-    case "EXTRACT":
-      return generateExtract(tile, ctx);
-    case "SCREENSHOT":
-      return generateScreenshot(tile, ctx);
-    case "WAIT":
-      return generateWait(tile, ctx);
-    case "SELECT":
-      return generateSelect(tile, ctx);
-    case "FORM":
-      return generateForm(tile, ctx);
-    default:
-      return `  // Unknown tile type: ${tile.type}`;
-  }
+	switch (tile.type) {
+		case "NAVIGATE":
+			return generateNavigate(tile, ctx);
+		case "CLICK":
+			return generateClick(tile, ctx);
+		case "TYPE":
+			return generateType(tile, ctx);
+		case "AUTH":
+			return generateAuth(tile, ctx);
+		case "EXTRACT":
+			return generateExtract(tile, ctx);
+		case "SCREENSHOT":
+			return generateScreenshot(tile, ctx);
+		case "WAIT":
+			return generateWait(tile, ctx);
+		case "SELECT":
+			return generateSelect(tile, ctx);
+		case "FORM":
+			return generateForm(tile, ctx);
+		default:
+			return `  // Unknown tile type: ${tile.type}`;
+	}
 }
 
 // ============================================================================
@@ -327,36 +345,36 @@ function generateTileCode(tile: Tile, ctx: GeneratorContext): string {
  * ```
  */
 export function compile(
-  blueprint: Blueprint,
-  options: CompileOptions = {}
+	blueprint: Blueprint,
+	options: CompileOptions = {},
 ): CompiledBlueprint {
-  const {
-    functionName = "execute",
-    includeComments = true,
-    indentation = 2,
-  } = options;
+	const {
+		functionName = "execute",
+		includeComments = true,
+		indentation = 2,
+	} = options;
 
-  const ctx: GeneratorContext = {
-    includeComments,
-    indentation,
-    inputVars: new Set(),
-    outputVars: new Set(),
-  };
+	const ctx: GeneratorContext = {
+		includeComments,
+		indentation,
+		inputVars: new Set(),
+		outputVars: new Set(),
+	};
 
-  // Sort tiles by execution order
-  const sortedTiles = sortTiles(blueprint.tiles);
+	// Sort tiles by execution order
+	const sortedTiles = sortTiles(blueprint.tiles);
 
-  // Generate tile code
-  const tileCode = sortedTiles
-    .map((tile) => generateTileCode(tile, ctx))
-    .join("\n\n");
+	// Generate tile code
+	const tileCode = sortedTiles
+		.map((tile) => generateTileCode(tile, ctx))
+		.join("\n\n");
 
-  // Build the full code
-  const description = blueprint.description
-    ? `\n * ${escapeString(blueprint.description)}`
-    : "";
+	// Build the full code
+	const description = blueprint.description
+		? `\n * ${escapeString(blueprint.description)}`
+		: "";
 
-  const code = `import type { Adapter, CredentialResolver } from "@trestleinc/crane/server";
+	const code = `import type { Adapter, CredentialResolver } from "@trestleinc/crane/server";
 
 /**
  * Generated from blueprint: ${escapeString(blueprint.name)}${description}
@@ -380,10 +398,10 @@ function interpolate(template: string, vars: Record<string, unknown>): string {
 }
 `;
 
-  return {
-    code,
-    functionName,
-    inputVariables: Array.from(ctx.inputVars),
-    outputVariables: Array.from(ctx.outputVars),
-  };
+	return {
+		code,
+		functionName,
+		inputVariables: Array.from(ctx.inputVars),
+		outputVariables: Array.from(ctx.outputVars),
+	};
 }
