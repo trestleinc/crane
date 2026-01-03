@@ -3,7 +3,7 @@ import type {
 	GenericActionCtx,
 	GenericDataModel,
 } from "convex/server";
-import type { Blueprint, Credential, Execution, Vault } from "$/shared/types";
+import type { Blueprint, Credential, Execution, Vault } from "$/shared/validators";
 import type {
 	CredentialOptions,
 	ExecutionOptions,

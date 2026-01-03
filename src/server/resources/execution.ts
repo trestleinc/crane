@@ -1,6 +1,15 @@
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
-import type { Execution } from "$/shared/types";
+import {
+	cancelledResponseValidator,
+	completedResponseValidator,
+	type Execution,
+	executionDocValidator,
+	executionResultValidator,
+	executionStatusValidator,
+	idResponseValidator,
+	startedResponseValidator,
+} from "$/shared/validators";
 import type { CraneComponentApi } from "../crane";
 import { NotFoundError } from "../errors";
 import type {
@@ -8,52 +17,6 @@ import type {
 	AnyQueryCtx,
 	ExecutionOptions,
 } from "../resource";
-
-const executionStatusValidator = v.union(
-	v.literal("pending"),
-	v.literal("running"),
-	v.literal("completed"),
-	v.literal("failed"),
-	v.literal("cancelled"),
-);
-
-const tileResultValidator = v.object({
-	tileId: v.string(),
-	status: v.string(),
-	result: v.optional(v.any()),
-	error: v.optional(v.string()),
-	duration: v.optional(v.number()),
-});
-
-const resultValidator = v.object({
-	success: v.boolean(),
-	duration: v.optional(v.number()),
-	outputs: v.optional(v.any()),
-	error: v.optional(v.string()),
-	tileResults: v.optional(v.array(tileResultValidator)),
-});
-
-const artifactValidator = v.object({
-	type: v.string(),
-	tileId: v.optional(v.string()),
-	storageId: v.string(),
-	metadata: v.optional(v.any()),
-});
-
-const executionValidator = v.object({
-	id: v.string(),
-	blueprintId: v.string(),
-	organizationId: v.string(),
-	context: v.optional(v.any()),
-	variables: v.record(v.string(), v.any()),
-	status: executionStatusValidator,
-	result: v.optional(resultValidator),
-	artifacts: v.optional(v.array(artifactValidator)),
-	workflowId: v.optional(v.string()),
-	createdAt: v.number(),
-	startedAt: v.optional(v.number()),
-	completedAt: v.optional(v.number()),
-});
 
 export function createExecutionResource(
 	component: CraneComponentApi,
@@ -66,7 +29,7 @@ export function createExecutionResource(
 
 		get: queryGeneric({
 			args: { id: v.string() },
-			returns: v.union(executionValidator, v.null()),
+			returns: v.union(executionDocValidator, v.null()),
 			handler: async (ctx: AnyQueryCtx, { id }) => {
 				try {
 					const doc = await ctx.runQuery(component.public.executionGet, { id });
@@ -90,7 +53,7 @@ export function createExecutionResource(
 				status: v.optional(executionStatusValidator),
 				limit: v.optional(v.number()),
 			},
-			returns: v.array(executionValidator),
+			returns: v.array(executionDocValidator),
 			handler: async (ctx: AnyQueryCtx, args) => {
 				try {
 					if (hooks?.evalRead) {
@@ -115,10 +78,10 @@ export function createExecutionResource(
 				blueprintId: v.string(),
 				organizationId: v.string(),
 				variables: v.record(v.string(), v.any()),
-				context: v.optional(v.any()),
+				context: v.optional(v.record(v.string(), v.any())),
 				workflowId: v.optional(v.string()),
 			},
-			returns: v.object({ id: v.string() }),
+			returns: idResponseValidator,
 			handler: async (ctx: AnyMutationCtx, args) => {
 				try {
 					if (hooks?.evalWrite) {
@@ -157,9 +120,14 @@ export function createExecutionResource(
 
 		start: mutationGeneric({
 			args: { id: v.string() },
-			returns: v.object({ started: v.boolean() }),
+			returns: startedResponseValidator,
 			handler: async (ctx: AnyMutationCtx, { id }) => {
 				try {
+					const prev = await ctx.runQuery(component.public.executionGet, { id });
+					if (!prev) {
+						throw new NotFoundError("Execution", id);
+					}
+
 					const doc = await ctx.runMutation(component.public.executionStart, {
 						id,
 					});
@@ -181,11 +149,16 @@ export function createExecutionResource(
 		complete: mutationGeneric({
 			args: {
 				id: v.string(),
-				result: resultValidator,
+				result: executionResultValidator,
 			},
-			returns: v.object({ completed: v.boolean() }),
+			returns: completedResponseValidator,
 			handler: async (ctx: AnyMutationCtx, { id, result }) => {
 				try {
+					const prev = await ctx.runQuery(component.public.executionGet, { id });
+					if (!prev) {
+						throw new NotFoundError("Execution", id);
+					}
+
 					const doc = await ctx.runMutation(
 						component.public.executionComplete,
 						{ id, result },
@@ -210,9 +183,14 @@ export function createExecutionResource(
 				id: v.string(),
 				reason: v.optional(v.string()),
 			},
-			returns: v.object({ cancelled: v.boolean() }),
+			returns: cancelledResponseValidator,
 			handler: async (ctx: AnyMutationCtx, { id, reason }) => {
 				try {
+					const prev = await ctx.runQuery(component.public.executionGet, { id });
+					if (!prev) {
+						throw new NotFoundError("Execution", id);
+					}
+
 					const result = {
 						success: false,
 						error: reason ?? "Cancelled by user",

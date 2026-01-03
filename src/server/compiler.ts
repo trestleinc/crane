@@ -5,7 +5,7 @@
  * Generated code uses the Adapter abstraction and can run independently.
  */
 
-import type { Blueprint, Tile } from "../shared/types";
+import type { Blueprint, Tile } from "$/shared/validators";
 import type { CompiledBlueprint, CompileOptions } from "./types";
 
 // ============================================================================
@@ -43,17 +43,6 @@ function escapeString(str: string): string {
 		.replace(/\n/g, "\\n")
 		.replace(/\r/g, "\\r")
 		.replace(/\t/g, "\\t");
-}
-
-/**
- * Indent code block.
- */
-function indent(code: string, level: number, spaces: number): string {
-	const prefix = " ".repeat(level * spaces);
-	return code
-		.split("\n")
-		.map((line) => (line.trim() ? prefix + line : line))
-		.join("\n");
 }
 
 /**

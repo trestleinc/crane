@@ -1,59 +1,16 @@
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
-import type { Blueprint } from "$/shared/types";
-import type { CraneComponentApi } from "../crane";
-import { NotFoundError } from "../errors";
-import type { AnyMutationCtx, AnyQueryCtx, ResourceOptions } from "../resource";
-
-const tileTypeValidator = v.union(
-	v.literal("NAVIGATE"),
-	v.literal("CLICK"),
-	v.literal("TYPE"),
-	v.literal("EXTRACT"),
-	v.literal("SCREENSHOT"),
-	v.literal("WAIT"),
-	v.literal("SELECT"),
-	v.literal("FORM"),
-	v.literal("AUTH"),
-);
-
-const tileValidator = v.object({
-	id: v.string(),
-	type: tileTypeValidator,
-	label: v.string(),
-	description: v.optional(v.string()),
-	position: v.object({ x: v.number(), y: v.number() }),
-	parameters: v.any(),
-	connections: v.object({
-		input: v.union(v.string(), v.null()),
-		output: v.union(v.string(), v.null()),
-	}),
-});
-
-const metadataValidator = v.object({
-	tags: v.optional(v.array(v.string())),
-	inputSchema: v.optional(
-		v.array(
-			v.object({
-				name: v.string(),
-				type: v.string(),
-				required: v.boolean(),
-				description: v.optional(v.string()),
-			}),
-		),
-	),
-});
-
-const blueprintValidator = v.object({
-	id: v.string(),
-	organizationId: v.string(),
-	name: v.string(),
-	description: v.optional(v.string()),
-	tiles: v.array(tileValidator),
-	metadata: metadataValidator,
-	createdAt: v.number(),
-	updatedAt: v.number(),
-});
+import {
+	type Blueprint,
+	blueprintDocValidator,
+	idResponseValidator,
+	metadataValidator,
+	removedResponseValidator,
+	tileValidator,
+} from "$/shared/validators";
+import type { CraneComponentApi } from "$/server/crane";
+import { NotFoundError } from "$/server/errors";
+import type { AnyMutationCtx, AnyQueryCtx, ResourceOptions } from "$/server/resource";
 
 export function createBlueprintResource(
 	component: CraneComponentApi,
@@ -66,7 +23,7 @@ export function createBlueprintResource(
 
 		get: queryGeneric({
 			args: { id: v.string() },
-			returns: v.union(blueprintValidator, v.null()),
+			returns: v.union(blueprintDocValidator, v.null()),
 			handler: async (ctx: AnyQueryCtx, { id }) => {
 				try {
 					const doc = await ctx.runQuery(component.public.blueprintGet, { id });
@@ -88,7 +45,7 @@ export function createBlueprintResource(
 				organizationId: v.string(),
 				limit: v.optional(v.number()),
 			},
-			returns: v.array(blueprintValidator),
+			returns: v.array(blueprintDocValidator),
 			handler: async (ctx: AnyQueryCtx, args) => {
 				try {
 					if (hooks?.evalRead) {
@@ -116,7 +73,7 @@ export function createBlueprintResource(
 				tiles: v.array(tileValidator),
 				metadata: v.optional(metadataValidator),
 			},
-			returns: v.object({ id: v.string() }),
+			returns: idResponseValidator,
 			handler: async (ctx: AnyMutationCtx, args) => {
 				try {
 					if (hooks?.evalWrite) {
@@ -161,7 +118,7 @@ export function createBlueprintResource(
 				tiles: v.optional(v.array(tileValidator)),
 				metadata: v.optional(metadataValidator),
 			},
-			returns: v.object({ id: v.string() }),
+			returns: idResponseValidator,
 			handler: async (ctx: AnyMutationCtx, { id, ...updates }) => {
 				try {
 					const prev = await ctx.runQuery(component.public.blueprintGet, {
@@ -206,7 +163,7 @@ export function createBlueprintResource(
 
 		remove: mutationGeneric({
 			args: { id: v.string() },
-			returns: v.object({ removed: v.boolean() }),
+			returns: removedResponseValidator,
 			handler: async (ctx: AnyMutationCtx, { id }) => {
 				try {
 					const doc = await ctx.runQuery(component.public.blueprintGet, { id });

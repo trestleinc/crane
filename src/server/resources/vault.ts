@@ -1,25 +1,9 @@
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
-import type { Vault } from "$/shared/types";
+import { type Vault, vaultDocValidator } from "$/shared/validators";
 import type { CraneComponentApi } from "../crane";
 import { NotFoundError } from "../errors";
 import type { AnyMutationCtx, AnyQueryCtx, VaultOptions } from "../resource";
-
-const vaultValidator = v.object({
-	organizationId: v.string(),
-	salt: v.string(),
-	iterations: v.number(),
-	encryptedVaultKey: v.string(),
-	vaultKeyIv: v.string(),
-	encryptedMachineKey: v.optional(v.string()),
-	machineKeyIv: v.optional(v.string()),
-	workosM2MClientId: v.optional(v.string()),
-	automationEnabled: v.boolean(),
-	browserbaseContextId: v.optional(v.string()),
-	verificationHash: v.string(),
-	createdAt: v.number(),
-	updatedAt: v.number(),
-});
 
 export function createVaultResource(
 	component: CraneComponentApi,
@@ -32,7 +16,7 @@ export function createVaultResource(
 
 		get: queryGeneric({
 			args: { organizationId: v.string() },
-			returns: v.union(vaultValidator, v.null()),
+			returns: v.union(vaultDocValidator, v.null()),
 			handler: async (ctx: AnyQueryCtx, { organizationId }) => {
 				try {
 					if (hooks?.evalRead) {
@@ -96,7 +80,7 @@ export function createVaultResource(
 
 		unlock: queryGeneric({
 			args: { organizationId: v.string() },
-			returns: v.union(vaultValidator, v.null()),
+			returns: v.union(vaultDocValidator, v.null()),
 			handler: async (ctx: AnyQueryCtx, { organizationId }) => {
 				try {
 					if (hooks?.evalRead) {

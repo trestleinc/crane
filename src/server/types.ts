@@ -254,3 +254,19 @@ export type M2MClaims = {
 	org_id?: string;
 	permissions?: string[];
 };
+
+// ============================================================================
+// Stagehand Types (for external library interop)
+// ============================================================================
+
+export type StagehandModelName = string & { __brand: "StagehandModel" };
+
+export type StagehandExtractSchema = Record<string, unknown>;
+
+export function asStagehandModel(name: string): StagehandModelName {
+	return name as StagehandModelName;
+}
+
+export function asExtractSchema(schema: unknown): StagehandExtractSchema {
+	return schema as StagehandExtractSchema;
+}

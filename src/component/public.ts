@@ -1,71 +1,17 @@
-import { v } from "convex/values";
-import { mutation, query } from "$/component/_generated/server";
-import { getLogger } from "$/component/logger";
-
-const tileTypeValidator = v.union(
-	v.literal("NAVIGATE"),
-	v.literal("CLICK"),
-	v.literal("TYPE"),
-	v.literal("EXTRACT"),
-	v.literal("SCREENSHOT"),
-	v.literal("WAIT"),
-	v.literal("SELECT"),
-	v.literal("FORM"),
-	v.literal("AUTH"),
-);
-
-const tileValidator = v.object({
-	id: v.string(),
-	type: tileTypeValidator,
-	label: v.string(),
-	description: v.optional(v.string()),
-	position: v.object({ x: v.number(), y: v.number() }),
-	parameters: v.any(),
-	connections: v.object({
-		input: v.union(v.string(), v.null()),
-		output: v.union(v.string(), v.null()),
-	}),
-});
-
-const metadataValidator = v.object({
-	tags: v.optional(v.array(v.string())),
-	inputSchema: v.optional(
-		v.array(
-			v.object({
-				name: v.string(),
-				type: v.string(),
-				required: v.boolean(),
-				description: v.optional(v.string()),
-			}),
-		),
-	),
-});
-
-const resultValidator = v.object({
-	success: v.boolean(),
-	duration: v.optional(v.number()),
-	outputs: v.optional(v.any()),
-	error: v.optional(v.string()),
-	tileResults: v.optional(
-		v.array(
-			v.object({
-				tileId: v.string(),
-				status: v.string(),
-				result: v.optional(v.any()),
-				error: v.optional(v.string()),
-				duration: v.optional(v.number()),
-			}),
-		),
-	),
-});
-
-const executionStatusValidator = v.union(
-	v.literal("pending"),
-	v.literal("running"),
-	v.literal("completed"),
-	v.literal("failed"),
-	v.literal("cancelled"),
-);
+import { v } from 'convex/values';
+import { mutation, query } from '$/component/_generated/server';
+import { getLogger } from '$/component/logger';
+import {
+  blueprintDocValidator,
+  credentialDocValidator,
+  executionDocValidator,
+  executionResultValidator,
+  executionStatusValidator,
+  metadataValidator,
+  removedResponseValidator,
+  tileValidator,
+  vaultDocValidator,
+} from '$/shared/validators';
 
 // ============================================================================
 // BLUEPRINT - Flat exports
@@ -73,11 +19,11 @@ const executionStatusValidator = v.union(
 
 export const blueprintGet = query({
 	args: { id: v.string() },
-	returns: v.any(),
+	returns: v.union(blueprintDocValidator, v.null()),
 	handler: async (ctx, { id }) => {
 		return ctx.db
-			.query("blueprints")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('blueprints')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 	},
 });
@@ -87,14 +33,12 @@ export const blueprintList = query({
 		organizationId: v.string(),
 		limit: v.optional(v.number()),
 	},
-	returns: v.any(),
+	returns: v.array(blueprintDocValidator),
 	handler: async (ctx, { organizationId, limit = 50 }) => {
 		return ctx.db
-			.query("blueprints")
-			.withIndex("by_organization", (q) =>
-				q.eq("organizationId", organizationId),
-			)
-			.order("desc")
+			.query('blueprints')
+			.withIndex('by_organization', (q) => q.eq('organizationId', organizationId))
+			.order('desc')
 			.take(limit);
 	},
 });
@@ -107,9 +51,9 @@ export const blueprintCreate = mutation({
 		tiles: v.array(tileValidator),
 		metadata: v.optional(metadataValidator),
 	},
-	returns: v.any(),
+	returns: blueprintDocValidator,
 	handler: async (ctx, args) => {
-		const logger = getLogger(["blueprint"]);
+		const logger = getLogger(['blueprint']);
 		const id = crypto.randomUUID();
 		const now = Date.now();
 
@@ -124,9 +68,9 @@ export const blueprintCreate = mutation({
 			updatedAt: now,
 		};
 
-		await ctx.db.insert("blueprints", doc);
+		await ctx.db.insert('blueprints', doc);
 
-		logger.info("Blueprint created", { id, name: args.name });
+		logger.info('Blueprint created', { id, name: args.name });
 		return doc;
 	},
 });
@@ -139,12 +83,12 @@ export const blueprintUpdate = mutation({
 		tiles: v.optional(v.array(tileValidator)),
 		metadata: v.optional(metadataValidator),
 	},
-	returns: v.any(),
+	returns: v.union(blueprintDocValidator, v.null()),
 	handler: async (ctx, { id, ...updates }) => {
-		const logger = getLogger(["blueprint"]);
+		const logger = getLogger(['blueprint']);
 		const existing = await ctx.db
-			.query("blueprints")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('blueprints')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 		if (!existing) throw new Error(`Blueprint not found: ${id}`);
 
@@ -157,23 +101,23 @@ export const blueprintUpdate = mutation({
 		await ctx.db.patch(existing._id, { ...clean, updatedAt: now });
 
 		const updated = await ctx.db.get(existing._id);
-		logger.info("Blueprint updated", { id });
+		logger.info('Blueprint updated', { id });
 		return updated;
 	},
 });
 
 export const blueprintRemove = mutation({
 	args: { id: v.string() },
-	returns: v.any(),
+	returns: removedResponseValidator,
 	handler: async (ctx, { id }) => {
-		const logger = getLogger(["blueprint"]);
+		const logger = getLogger(['blueprint']);
 		const bp = await ctx.db
-			.query("blueprints")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('blueprints')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 		if (bp) {
 			await ctx.db.delete(bp._id);
-			logger.info("Blueprint removed", { id });
+			logger.info('Blueprint removed', { id });
 		}
 		return { removed: true };
 	},
@@ -185,11 +129,11 @@ export const blueprintRemove = mutation({
 
 export const executionGet = query({
 	args: { id: v.string() },
-	returns: v.any(),
+	returns: v.union(executionDocValidator, v.null()),
 	handler: async (ctx, { id }) => {
 		return ctx.db
-			.query("executions")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('executions')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 	},
 });
@@ -201,20 +145,18 @@ export const executionList = query({
 		status: v.optional(executionStatusValidator),
 		limit: v.optional(v.number()),
 	},
-	returns: v.any(),
+	returns: v.array(executionDocValidator),
 	handler: async (ctx, { organizationId, blueprintId, status, limit = 50 }) => {
 		const results = blueprintId
 			? await ctx.db
-					.query("executions")
-					.withIndex("by_blueprint", (q) => q.eq("blueprintId", blueprintId))
-					.order("desc")
+					.query('executions')
+					.withIndex('by_blueprint', (q) => q.eq('blueprintId', blueprintId))
+					.order('desc')
 					.take(limit)
 			: await ctx.db
-					.query("executions")
-					.withIndex("by_organization", (q) =>
-						q.eq("organizationId", organizationId),
-					)
-					.order("desc")
+					.query('executions')
+					.withIndex('by_organization', (q) => q.eq('organizationId', organizationId))
+					.order('desc')
 					.take(limit);
 		return status ? results.filter((e) => e.status === status) : results;
 	},
@@ -224,16 +166,16 @@ export const executionCreate = mutation({
 	args: {
 		blueprintId: v.string(),
 		organizationId: v.string(),
-		variables: v.any(),
-		context: v.optional(v.any()),
+		variables: v.record(v.string(), v.any()),
+		context: v.optional(v.record(v.string(), v.any())),
 	},
-	returns: v.any(),
+	returns: executionDocValidator,
 	handler: async (ctx, args) => {
-		const logger = getLogger(["execution"]);
+		const logger = getLogger(['execution']);
 
 		const bp = await ctx.db
-			.query("blueprints")
-			.withIndex("by_uuid", (q) => q.eq("id", args.blueprintId))
+			.query('blueprints')
+			.withIndex('by_uuid', (q) => q.eq('id', args.blueprintId))
 			.unique();
 		if (!bp) throw new Error(`Blueprint not found: ${args.blueprintId}`);
 
@@ -246,32 +188,32 @@ export const executionCreate = mutation({
 			organizationId: args.organizationId,
 			variables: args.variables,
 			context: args.context,
-			status: "pending" as const,
+			status: 'pending' as const,
 			createdAt: now,
 		};
 
-		await ctx.db.insert("executions", doc);
+		await ctx.db.insert('executions', doc);
 
-		logger.info("Execution created", { id, blueprintId: args.blueprintId });
+		logger.info('Execution created', { id, blueprintId: args.blueprintId });
 		return doc;
 	},
 });
 
 export const executionStart = mutation({
 	args: { id: v.string() },
-	returns: v.any(),
+	returns: v.union(executionDocValidator, v.null()),
 	handler: async (ctx, { id }) => {
-		const logger = getLogger(["execution"]);
+		const logger = getLogger(['execution']);
 		const e = await ctx.db
-			.query("executions")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('executions')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 		if (!e) throw new Error(`Execution not found: ${id}`);
-		if (e.status !== "pending") throw new Error(`Execution not pending: ${id}`);
-		await ctx.db.patch(e._id, { status: "running", startedAt: Date.now() });
+		if (e.status !== 'pending') throw new Error(`Execution not pending: ${id}`);
+		await ctx.db.patch(e._id, { status: 'running', startedAt: Date.now() });
 
 		const updated = await ctx.db.get(e._id);
-		logger.info("Execution started", { id });
+		logger.info('Execution started', { id });
 		return updated;
 	},
 });
@@ -279,38 +221,36 @@ export const executionStart = mutation({
 export const executionComplete = mutation({
 	args: {
 		id: v.string(),
-		result: resultValidator,
+		result: executionResultValidator,
 	},
-	returns: v.any(),
+	returns: v.union(executionDocValidator, v.null()),
 	handler: async (ctx, { id, result }) => {
-		const logger = getLogger(["execution"]);
+		const logger = getLogger(['execution']);
 		const e = await ctx.db
-			.query("executions")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('executions')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 		if (!e) throw new Error(`Execution not found: ${id}`);
 
 		await ctx.db.patch(e._id, {
-			status: result.success ? "completed" : "failed",
+			status: result.success ? 'completed' : 'failed',
 			result,
 			completedAt: Date.now(),
 		});
 
 		const updated = await ctx.db.get(e._id);
-		logger.info("Execution completed", { id, success: result.success });
+		logger.info('Execution completed', { id, success: result.success });
 		return updated;
 	},
 });
 
 export const vaultGet = query({
 	args: { organizationId: v.string() },
-	returns: v.any(),
+	returns: v.union(vaultDocValidator, v.null()),
 	handler: async (ctx, { organizationId }) => {
 		return ctx.db
-			.query("vaults")
-			.withIndex("by_organization", (q) =>
-				q.eq("organizationId", organizationId),
-			)
+			.query('vaults')
+			.withIndex('by_organization', (q) => q.eq('organizationId', organizationId))
 			.unique();
 	},
 });
@@ -324,18 +264,15 @@ export const vaultSetup = mutation({
 		vaultKeyIv: v.string(),
 		verificationHash: v.string(),
 	},
-	returns: v.any(),
+	returns: vaultDocValidator,
 	handler: async (ctx, args) => {
-		const logger = getLogger(["vault"]);
+		const logger = getLogger(['vault']);
 		const existing = await ctx.db
-			.query("vaults")
-			.withIndex("by_organization", (q) =>
-				q.eq("organizationId", args.organizationId),
-			)
+			.query('vaults')
+			.withIndex('by_organization', (q) => q.eq('organizationId', args.organizationId))
 			.unique();
 
-		if (existing)
-			throw new Error(`Vault already exists: ${args.organizationId}`);
+		if (existing) throw new Error(`Vault already exists: ${args.organizationId}`);
 
 		const now = Date.now();
 		const doc = {
@@ -345,22 +282,20 @@ export const vaultSetup = mutation({
 			updatedAt: now,
 		};
 
-		await ctx.db.insert("vaults", doc);
+		await ctx.db.insert('vaults', doc);
 
-		logger.info("Vault setup", { organizationId: args.organizationId });
+		logger.info('Vault setup', { organizationId: args.organizationId });
 		return doc;
 	},
 });
 
 export const vaultUnlock = query({
 	args: { organizationId: v.string() },
-	returns: v.any(),
+	returns: v.union(vaultDocValidator, v.null()),
 	handler: async (ctx, { organizationId }) => {
 		return ctx.db
-			.query("vaults")
-			.withIndex("by_organization", (q) =>
-				q.eq("organizationId", organizationId),
-			)
+			.query('vaults')
+			.withIndex('by_organization', (q) => q.eq('organizationId', organizationId))
 			.unique();
 	},
 });
@@ -372,14 +307,12 @@ export const vaultEnable = mutation({
 		machineKeyIv: v.string(),
 		workosM2MClientId: v.optional(v.string()),
 	},
-	returns: v.any(),
+	returns: v.union(vaultDocValidator, v.null()),
 	handler: async (ctx, { organizationId, ...updates }) => {
-		const logger = getLogger(["vault"]);
+		const logger = getLogger(['vault']);
 		const vault = await ctx.db
-			.query("vaults")
-			.withIndex("by_organization", (q) =>
-				q.eq("organizationId", organizationId),
-			)
+			.query('vaults')
+			.withIndex('by_organization', (q) => q.eq('organizationId', organizationId))
 			.unique();
 
 		if (!vault) throw new Error(`Vault not found: ${organizationId}`);
@@ -391,7 +324,7 @@ export const vaultEnable = mutation({
 		});
 
 		const updated = await ctx.db.get(vault._id);
-		logger.info("Vault enabled", { organizationId });
+		logger.info('Vault enabled', { organizationId });
 		return updated;
 	},
 });
@@ -403,12 +336,10 @@ export const vaultContext = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, { organizationId, browserbaseContextId }) => {
-		const logger = getLogger(["vault"]);
+		const logger = getLogger(['vault']);
 		const vault = await ctx.db
-			.query("vaults")
-			.withIndex("by_organization", (q) =>
-				q.eq("organizationId", organizationId),
-			)
+			.query('vaults')
+			.withIndex('by_organization', (q) => q.eq('organizationId', organizationId))
 			.unique();
 
 		if (!vault) throw new Error(`Vault not found: ${organizationId}`);
@@ -418,18 +349,18 @@ export const vaultContext = mutation({
 			updatedAt: Date.now(),
 		});
 
-		logger.info("Vault context updated", { organizationId });
+		logger.info('Vault context updated', { organizationId });
 		return null;
 	},
 });
 
 export const credentialGet = query({
 	args: { id: v.string() },
-	returns: v.any(),
+	returns: v.union(credentialDocValidator, v.null()),
 	handler: async (ctx, { id }) => {
 		return ctx.db
-			.query("credentials")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('credentials')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 	},
 });
@@ -439,14 +370,12 @@ export const credentialList = query({
 		organizationId: v.string(),
 		limit: v.optional(v.number()),
 	},
-	returns: v.any(),
+	returns: v.array(credentialDocValidator),
 	handler: async (ctx, { organizationId, limit = 50 }) => {
 		return ctx.db
-			.query("credentials")
-			.withIndex("by_organization", (q) =>
-				q.eq("organizationId", organizationId),
-			)
-			.order("desc")
+			.query('credentials')
+			.withIndex('by_organization', (q) => q.eq('organizationId', organizationId))
+			.order('desc')
 			.take(limit);
 	},
 });
@@ -459,9 +388,9 @@ export const credentialCreate = mutation({
 		encryptedPayload: v.string(),
 		payloadIv: v.string(),
 	},
-	returns: v.any(),
+	returns: credentialDocValidator,
 	handler: async (ctx, args) => {
-		const logger = getLogger(["credential"]);
+		const logger = getLogger(['credential']);
 		const id = crypto.randomUUID();
 		const now = Date.now();
 
@@ -472,9 +401,9 @@ export const credentialCreate = mutation({
 			updatedAt: now,
 		};
 
-		await ctx.db.insert("credentials", doc);
+		await ctx.db.insert('credentials', doc);
 
-		logger.info("Credential created", { id, domain: args.domain });
+		logger.info('Credential created', { id, domain: args.domain });
 		return doc;
 	},
 });
@@ -487,12 +416,12 @@ export const credentialUpdate = mutation({
 		encryptedPayload: v.optional(v.string()),
 		payloadIv: v.optional(v.string()),
 	},
-	returns: v.any(),
+	returns: v.union(credentialDocValidator, v.null()),
 	handler: async (ctx, { id, ...updates }) => {
-		const logger = getLogger(["credential"]);
+		const logger = getLogger(['credential']);
 		const existing = await ctx.db
-			.query("credentials")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('credentials')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 
 		if (!existing) throw new Error(`Credential not found: ${id}`);
@@ -505,24 +434,24 @@ export const credentialUpdate = mutation({
 		await ctx.db.patch(existing._id, { ...clean, updatedAt: Date.now() });
 
 		const updated = await ctx.db.get(existing._id);
-		logger.info("Credential updated", { id });
+		logger.info('Credential updated', { id });
 		return updated;
 	},
 });
 
 export const credentialRemove = mutation({
 	args: { id: v.string() },
-	returns: v.any(),
+	returns: removedResponseValidator,
 	handler: async (ctx, { id }) => {
-		const logger = getLogger(["credential"]);
+		const logger = getLogger(['credential']);
 		const cred = await ctx.db
-			.query("credentials")
-			.withIndex("by_uuid", (q) => q.eq("id", id))
+			.query('credentials')
+			.withIndex('by_uuid', (q) => q.eq('id', id))
 			.unique();
 
 		if (cred) {
 			await ctx.db.delete(cred._id);
-			logger.info("Credential removed", { id });
+			logger.info('Credential removed', { id });
 		}
 		return { removed: true };
 	},
@@ -533,13 +462,11 @@ export const credentialResolve = query({
 		organizationId: v.string(),
 		domain: v.string(),
 	},
-	returns: v.any(),
+	returns: v.union(credentialDocValidator, v.null()),
 	handler: async (ctx, { organizationId, domain }) => {
 		return ctx.db
-			.query("credentials")
-			.withIndex("by_domain", (q) =>
-				q.eq("organizationId", organizationId).eq("domain", domain),
-			)
+			.query('credentials')
+			.withIndex('by_domain', (q) => q.eq('organizationId', organizationId).eq('domain', domain))
 			.unique();
 	},
 });

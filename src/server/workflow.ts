@@ -6,8 +6,15 @@ import type {
 	GenericDataModel,
 } from "convex/server";
 import { v } from "convex/values";
-import type { Blueprint, Tile, TileResult } from "$/shared/types";
-import type { ExecutionResult } from "./types";
+import { tileValidator, type Blueprint, type Tile, type TileResult } from "$/shared/validators";
+
+type WorkflowStartArgs = {
+	blueprint: Blueprint;
+	variables: Record<string, unknown>;
+	executionId: string;
+	organizationId: string;
+	context?: unknown;
+};
 
 type OnCompleteReference = FunctionReference<
 	"mutation",
@@ -109,9 +116,16 @@ export function createWorkflowExecutor(config: WorkflowExecutorConfig) {
 				context?: unknown;
 			},
 		): Promise<WorkflowId> => {
+			const args: WorkflowStartArgs = {
+				blueprint: options.blueprint,
+				variables: options.variables,
+				executionId: options.executionId,
+				organizationId: options.organizationId,
+				context: options.context,
+			};
 			const workflowId = await workflowManager.start(
 				ctx,
-				options as any,
+				args as unknown as Parameters<typeof workflowManager.start>[1],
 				callbacks?.onComplete
 					? {
 							onComplete: callbacks.onComplete,
@@ -184,22 +198,11 @@ export const workflowArgs = {
 	executionId: v.string(),
 	organizationId: v.string(),
 	variables: v.record(v.string(), v.any()),
-	context: v.optional(v.any()),
+	context: v.optional(v.record(v.string(), v.any())),
 };
 
 export const tileStepArgs = {
-	tile: v.object({
-		id: v.string(),
-		type: v.string(),
-		label: v.string(),
-		description: v.optional(v.string()),
-		position: v.object({ x: v.number(), y: v.number() }),
-		parameters: v.record(v.string(), v.any()),
-		connections: v.object({
-			input: v.union(v.string(), v.null()),
-			output: v.union(v.string(), v.null()),
-		}),
-	}),
+	tile: tileValidator,
 	variables: v.record(v.string(), v.any()),
 	executionId: v.string(),
 };

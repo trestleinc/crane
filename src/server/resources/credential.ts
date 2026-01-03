@@ -1,6 +1,11 @@
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
-import type { Credential } from "$/shared/types";
+import {
+	type Credential,
+	credentialDocValidator,
+	idResponseValidator,
+	removedResponseValidator,
+} from "$/shared/validators";
 import type { CraneComponentApi } from "../crane";
 import { NotFoundError } from "../errors";
 import type {
@@ -8,17 +13,6 @@ import type {
 	AnyQueryCtx,
 	CredentialOptions,
 } from "../resource";
-
-const credentialValidator = v.object({
-	id: v.string(),
-	organizationId: v.string(),
-	name: v.string(),
-	domain: v.string(),
-	encryptedPayload: v.string(),
-	payloadIv: v.string(),
-	createdAt: v.number(),
-	updatedAt: v.number(),
-});
 
 export function createCredentialResource(
 	component: CraneComponentApi,
@@ -31,7 +25,7 @@ export function createCredentialResource(
 
 		get: queryGeneric({
 			args: { id: v.string() },
-			returns: v.union(credentialValidator, v.null()),
+			returns: v.union(credentialDocValidator, v.null()),
 			handler: async (ctx: AnyQueryCtx, { id }) => {
 				try {
 					const doc = await ctx.runQuery(component.public.credentialGet, {
@@ -55,7 +49,7 @@ export function createCredentialResource(
 				organizationId: v.string(),
 				limit: v.optional(v.number()),
 			},
-			returns: v.array(credentialValidator),
+			returns: v.array(credentialDocValidator),
 			handler: async (ctx: AnyQueryCtx, args) => {
 				try {
 					if (hooks?.evalRead) {
@@ -83,7 +77,7 @@ export function createCredentialResource(
 				encryptedPayload: v.string(),
 				payloadIv: v.string(),
 			},
-			returns: v.object({ id: v.string() }),
+			returns: idResponseValidator,
 			handler: async (ctx: AnyMutationCtx, args) => {
 				try {
 					if (hooks?.evalWrite) {
@@ -128,7 +122,7 @@ export function createCredentialResource(
 				encryptedPayload: v.optional(v.string()),
 				payloadIv: v.optional(v.string()),
 			},
-			returns: v.object({ id: v.string() }),
+			returns: idResponseValidator,
 			handler: async (ctx: AnyMutationCtx, { id, ...updates }) => {
 				try {
 					const prev = await ctx.runQuery(component.public.credentialGet, {
@@ -173,7 +167,7 @@ export function createCredentialResource(
 
 		remove: mutationGeneric({
 			args: { id: v.string() },
-			returns: v.object({ removed: v.boolean() }),
+			returns: removedResponseValidator,
 			handler: async (ctx: AnyMutationCtx, { id }) => {
 				try {
 					const doc = await ctx.runQuery(component.public.credentialGet, {
@@ -206,7 +200,7 @@ export function createCredentialResource(
 				organizationId: v.string(),
 				domain: v.string(),
 			},
-			returns: v.union(credentialValidator, v.null()),
+			returns: v.union(credentialDocValidator, v.null()),
 			handler: async (ctx: AnyQueryCtx, args) => {
 				try {
 					if (hooks?.evalRead) {

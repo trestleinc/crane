@@ -10,7 +10,8 @@ import type {
 	ModelConfig,
 	TileResult,
 } from "$/server/types";
-import type { Blueprint, Tile } from "$/shared/types";
+import { asExtractSchema, asStagehandModel } from "$/server/types";
+import type { Blueprint, Tile } from "$/shared/validators";
 
 export type DirectExecutorConfig = {
 	browserbase: BrowserbaseConfig;
@@ -338,7 +339,7 @@ export async function runBlueprintDirect(
 		env: "BROWSERBASE",
 		apiKey: config.browserbase.apiKey,
 		projectId: config.browserbase.projectId,
-		model: modelName as any,
+		model: asStagehandModel(modelName),
 	});
 
 	await stagehand.init();
@@ -359,12 +360,13 @@ export async function runBlueprintDirect(
 				};
 			}
 		},
-		extract: async (instruction, schema) => {
+		extract: async <T = unknown>(instruction: string, schema?: unknown): Promise<T> => {
 			if (schema) {
-				return stagehand.extract(instruction, schema as any);
+				const result = await stagehand.extract(instruction, asExtractSchema(schema));
+				return result as T;
 			}
 			const result = await stagehand.extract(instruction);
-			return result.extraction as any;
+			return result.extraction as T;
 		},
 		screenshot: async (opts) => {
 			const buffer = await page.screenshot({ fullPage: opts?.fullPage });
