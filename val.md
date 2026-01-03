@@ -346,21 +346,14 @@ src/
 ### Import Pattern
 
 ```typescript
-// In component files
-import {
-  tileValidator,
-  blueprintDocValidator,
-  executionStatusValidator,
-} from '../shared/validators';
-
-// In server files
+// Internal imports use path alias
 import {
   type Blueprint,
+  tileValidator,
   blueprintDocValidator,
-  idResponseValidator,
-} from '../../shared/validators';
+} from '$/shared/validators';
 
-// Via barrel export
+// Via public exports (for external consumers)
 import { Blueprint, tileValidator } from '@trestleinc/crane/shared';
 ```
 

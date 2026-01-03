@@ -1,19 +1,19 @@
 # AGENTS.md - Development Guide
 
 ## Commands
-- **Build:** `bun run build` (uses tsdown, outputs to `dist/`)
+- **Build:** `bun run build` (runs `oxlint --fix && tsdown`, outputs to `dist/`)
 - **Test:** `bun test` (Vitest). Run single: `bun test src/path/to/test.ts`
-- **Lint & Format:** `bun run check:fix` (Biome) - **ALWAYS RUN BEFORE COMMITTING**
 - **Type Check:** Build includes type checking via tsdown
 
 ## Code Style & Conventions
-- **Formatting:** 2 spaces, single quotes, semicolons (enforced by Biome).
+- **Formatting:** 2 spaces, single quotes, semicolons (enforced by oxlint).
 - **Imports:** Use `import type` for types. Use `node:` protocol for Node built-ins.
-- **Logging:** Use `LogTape`. Avoid `console.*` (warns in Biome, allowed in tests).
+- **Logging:** Use `LogTape`. Avoid `console.*` (warns in oxlint, allowed in tests).
 - **Structure:** Single package. `src/client` (browser), `src/server` (Convex), `src/component`.
 - **Documentation:** ALWAYS use `Context7` tool for library docs (Convex, Stagehand, jose).
 - **Scoping:** All data is scoped by `organizationId`.
 - **No Classes:** Use factory functions and type aliases. NOT interfaces for class implementations.
+- **Validation:** All types derived from validators using `Infer<typeof validator>` - see `val.md`.
 
 ## File Structure
 ```
@@ -42,10 +42,9 @@ src/
 │   ├── schema.ts            # Database schema
 │   ├── public.ts            # Component API
 │   └── logger.ts            # Component logging
-├── shared/                  # Shared types (all environments)
-│   ├── index.ts             # Re-exports
-│   ├── types.ts             # Blueprint, Tile, Execution, Vault, Credential
-│   └── validators.ts        # Convex validators for all types
+├── shared/                  # Shared validators and types (all environments)
+│   ├── index.ts             # Re-exports from validators.ts
+│   └── validators.ts        # All validators AND types (single source of truth)
 └── handler/                 # HTTP handler for execution endpoint
     └── index.ts
 ```
@@ -196,3 +195,5 @@ execution: {
 - App provides Adapter implementation - Crane defines the type.
 - Hooks: eval* for auth (throw to deny), before* for mutation modification, on* for side effects.
 - evalRemove and onRemove now receive full document (not just ID).
+- Import validators and types from `$/shared/validators` (single source of truth).
+- Types derived from validators using `Infer<typeof validator>` - no duplicate interfaces.

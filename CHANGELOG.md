@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-01-02
+
+### Breaking Changes
+
+- **Import Path Change**: Consolidated all validators and types into single `$/shared/validators` file
+  - `import { Blueprint } from '$/shared/types'` → `import { Blueprint } from '$/shared/validators'`
+  - `import { tileValidator } from '$/shared/convex-validators'` → `import { tileValidator } from '$/shared/validators'`
+  - Removed `$/shared/types` and `$/shared/convex-validators` - use `$/shared/validators` for all imports
+
+### Added
+
+- **Validator consolidation**: Single source of truth in `src/shared/validators.ts`
+  - All types derived from validators using `Infer<typeof validator>`
+  - No duplicate interfaces - types are always in sync with validators
+  - Branded ID types (`BlueprintId`, `ExecutionId`, `CredentialId`, `OrganizationId`)
+
+### Changed
+
+- **Linter migration**: Replaced eslint with oxlint for faster linting
+  - Build command now: `oxlint --fix && tsdown`
+- **`NotFoundError` checks**: Added to execution resource (`start`, `complete`, `cancel`)
+- **Schema improvement**: Uses imported `metadataValidator` instead of inline definition
+- **Type safety**: Fixed bare `v.any()` → `v.record(v.string(), v.any())` in workflow context
+
+### Removed
+
+- Removed unused runtime helpers (`valid()`, `display()`)
+- Removed `src/shared/types.ts` (merged into validators.ts)
+- Removed `src/shared/convex-validators.ts` (merged into validators.ts)
+
 ## [2.0.0] - 2026-01-02
 
 Major refactoring release with breaking changes, new features, and improved type safety.

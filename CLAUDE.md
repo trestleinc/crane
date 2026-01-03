@@ -23,15 +23,13 @@ Single package with exports:
 ## Development Commands
 
 ```bash
-# Build (includes type checking via tsdown)
-bun run build        # Build with tsdown (outputs to dist/)
+# Build (includes linting and type checking via tsdown)
+bun run build        # Runs oxlint --fix && tsdown (outputs to dist/)
 bun run clean        # Remove dist/
 
-# Lint & Format
-bun run check:fix    # Biome lint and format
-
-# Publishing
-bun run prepublish   # Runs build
+# Testing
+bun test             # Run all tests with Vitest
+bun test <path>      # Run specific test file
 ```
 
 ## Architecture
@@ -63,10 +61,9 @@ src/
 │   ├── schema.ts            # Database schema
 │   ├── public.ts            # Component API
 │   └── logger.ts            # Component logging
-├── shared/                  # Shared types (all environments)
-│   ├── index.ts             # Re-exports
-│   ├── types.ts             # Blueprint, Tile, Execution, Vault, Credential
-│   └── validators.ts        # Convex validators for all types
+├── shared/                  # Shared validators and types (all environments)
+│   ├── index.ts             # Re-exports from validators.ts
+│   └── validators.ts        # All validators AND types (single source of truth)
 └── handler/                 # HTTP handler for execution endpoint
     └── index.ts
 ```
@@ -290,7 +287,7 @@ try {
 - **Stagehand** for browser automation (peer dependency, app provides)
 - **jose** for JWT verification (WorkOS M2M)
 - **tsdown** for building
-- **Biome** for linting and formatting
+- **oxlint** for linting (fast, zero-config)
 - **LogTape** for logging (avoid console.*)
 
 ## Naming Conventions
@@ -311,3 +308,5 @@ try {
 - **onError hook** - Centralized error logging for all operations
 - **LogTape logging** - Use LogTape, not console.*
 - **Import types** - Use `import type` for type-only imports
+- **Single source of truth** - All validators and types in `$/shared/validators` (see `val.md`)
+- **Types from validators** - Use `Infer<typeof validator>`, not duplicate interfaces
